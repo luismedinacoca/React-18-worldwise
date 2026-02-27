@@ -516,7 +516,6 @@ const Homepage = () => {
 
 export default Homepage;
 ```
-
 ![Homepage with anchor tag](../img/section17-lecture207-001.png)
 
 ---
@@ -544,7 +543,6 @@ const Homepage = () => {
 
 export default Homepage;
 ```
-
 ![Homepage with link tag](../img/section17-lecture207-001.png)
 
 ---
@@ -609,7 +607,6 @@ const Homepage = () => {
 
 export default Homepage;
 ```
-
 ![Homepage with PageNav component](../img/section17-lecture207-002.png)
 
 ---
@@ -663,7 +660,6 @@ const Product = () => {
 
 export default Product;
 ```
-
 ![Product page with PageNav component](../img/section17-lecture207-004.png)
 
 ---
@@ -755,6 +751,116 @@ export default PageNav;
 - [ ] Remove redundant `<Link to="/pricing">Pricing</Link>` from `src/pages/Homepage.jsx` (line 9) if the PageNav already provides sufficient navigation
 
 [↑ top — 207. Lesson 207 — *Linking Between Routes With `<Link />` and `<NavLink />`*](#-207-lesson-207--linking-between-routes-with-link--and-navlink-)
+
+<br>
+
+## 🔧 208. Lesson 208 — *Styling Options For React Applications*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [208. Lesson 208 — *Styling Options For React Applications*](#-208-lesson-208--styling-options-for-react-applications)
+- [208.1 Context](#-2081-context)
+- [208.2 Updating code according the context](#-2082-updating-codetheory-according-the-context)
+  - [208.2.1 Styling Options Comparison Table](#20821-styling-options-comparison-table)
+- [208.3 Issues](#-2083-issues)
+- [208.4 Pending Fixes (TODO)](#-2084-pending-fixes-todo)
+
+### 🧠 208.1 Context:
+
+**React does not care about styling** — it is a UI library that handles rendering and state, but it does not prescribe how you style your components. Choosing a styling approach is entirely up to the developer. This lesson provides an overview of the main styling options available for React applications so you can make an informed decision for the Worldwise project.
+
+The five main approaches are: **inline CSS**, **CSS/Sass files**, **CSS Modules**, **CSS-in-JS** (e.g. Styled Components), and **utility-first CSS** (e.g. Tailwind). Each has different scope, where/how it is applied, and what it is based on. There are also **UI component libraries** (MUI, Chakra UI, Mantine) that provide pre-styled components as an alternative to writing CSS yourself.
+
+**Key Concepts:**
+
+1. **Inline CSS** — Apply styles via the `style` prop on JSX elements. Scope: local to the element. Based on: CSS. Good for one-off styles or dynamic values, but can become verbose and does not support pseudo-classes or media queries.
+2. **CSS or Sass files** — Traditional external `.css` (or `.scss`) files imported globally. Applied via `className`. Scope: entire app; can cause naming collisions and unintended overrides.
+3. **CSS Modules** — One external file per component; class names are automatically scoped/hashed to avoid collisions. Applied via `className`. Scope: component. Based on: CSS. Provides component-level encapsulation without extra libraries.
+4. **CSS-in-JS** — Write styles in JavaScript (e.g. Styled Components, Emotion). Creates new components; styles are scoped to the component. Based on: JavaScript. Good for dynamic styles and colocation, but adds runtime cost and bundle size.
+5. **Utility-first CSS (Tailwind)** — Pre-defined utility classes applied via `className`. Scope: per element. Based on: CSS (but configured via PostCSS). Fast prototyping, consistent design system; can lead to long `className` strings.
+6. **UI component libraries** — MUI, Chakra UI, Mantine, etc. Provide pre-built, themed components; little to no custom CSS needed. Trade-off: less control over design and larger bundles.
+
+**Advantages:**
+
+- **Inline CSS**: Quick for prototypes; supports dynamic values; no extra files.
+- **CSS/Sass files**: Familiar to all developers; full CSS feature set; easy to integrate with existing stylesheets.
+- **CSS Modules**: Component-scoped; no naming collisions; standard CSS syntax.
+- **CSS-in-JS**: Colocation of styles and logic; full JS power (variables, conditionals); no class name conflicts.
+- **Tailwind**: Rapid development; consistent spacing/colors; purges unused CSS in production.
+- **UI libraries**: Quick setup; accessible components; design system out of the box.
+
+**Disadvantages / Gotchas:**
+
+- **Inline CSS**: No pseudo-classes, media queries; verbose; harder to maintain at scale.
+- **CSS/Sass files**: Global scope; naming clashes (e.g. `.button` in multiple files); requires discipline (BEM, etc.).
+- **CSS Modules**: Extra `.module.css` convention; some learning curve for teams unfamiliar with it.
+- **CSS-in-JS**: Runtime overhead; larger bundle; vendor lock-in; SSR considerations.
+- **Tailwind**: Long class strings; HTML can look busy; requires build setup.
+- **UI libraries**: Opinionated design; bundle size; customization can be cumbersome.
+
+**When to Consider Alternatives:**
+
+- For a small prototype — inline CSS or a single global CSS file is fine.
+- For medium-to-large apps with many components — prefer CSS Modules or Tailwind to avoid global scope issues.
+- When you need heavy theming and dynamic styles — CSS-in-JS (Styled Components, Emotion) can be useful.
+- When you want to ship quickly and don't need a custom design — UI libraries (MUI, Chakra, Mantine) are a good fit.
+- For Worldwise — the project currently has no styling; the next lesson will likely choose one approach (e.g. CSS Modules or Tailwind) and implement it.
+
+---
+
+### ⚙️ 208.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section 208.2 introduces the different styling options available in React applications.
+- It does not modify code; it provides a conceptual overview via a comparison table so developers can choose an approach.
+- Subsection 208.2.1 presents the table "Styling Options in React" with columns: Styling Option, Where?, How?, Scope, and Based On.
+- The table covers five approaches (Inline CSS, CSS/Sass, CSS Modules, CSS-in-JS, Utility-first) plus UI libraries as an alternative.
+- The image highlights that React is styling-agnostic and compares scope (local vs global vs component-level).
+
+---
+
+#### 208.2.1 Styling Options Comparison Table
+
+**Subsection Summary:**
+
+- The image `section17-lecture208-001.png` displays a comparison table titled "STYLING OPTIONS IN REACT".
+- A note emphasizes: **"React doesn't care about styling"** — React handles rendering, not styling decisions.
+- The table has five rows for: **Inline CSS** (style prop, scope: JSX element, local); **CSS or Sass file** (className, scope: entire app — noted as "global, causes problems"); **CSS Modules** (one file per component, className, scope: component); **CSS-in-JS** (creates new component, scope: component); **Utility-first CSS** e.g. Tailwind (className, scope: JSX element).
+- Each row shows WHERE (JSX, external file, etc.), HOW (style prop, className, etc.), SCOPE, and BASED ON (CSS or JavaScript).
+- Below the table: **Alternative** — UI libraries (MUI, Chakra UI, Mantine) as an option instead of writing CSS.
+- The table helps developers decide which approach fits their project; global CSS is flagged as problematic; component-scoped options (CSS Modules, CSS-in-JS) are highlighted positively.
+
+![Styling Options in React](../img/section17-lecture208-001.png)
+
+---
+
+### 🐞 208.3 Issues:
+
+- **No styling approach implemented**: The Worldwise project has no CSS files, no Tailwind, and no styled-components; all components (PageNav, Homepage, Product, Pricing, PageNotFound) are unstyled.
+- **No global styles or reset**: `index.html` and `main.jsx` do not import any CSS; there is no baseline typography, margin reset, or design tokens.
+- **PageNav has no visual styling**: The `<nav>`, `<ul>`, and `<li>` elements in `PageNav` have no classes or styles; nav links are plain and not visually distinct from page content.
+- **NavLink active state has no CSS**: Although `NavLink` applies an `active` class when the route matches, there is no CSS to style the active link (e.g. bold, underline, background); the active state is effectively invisible.
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| No CSS or styling system in use | ⚠️ Identified | `package.json`, `src/main.jsx`: No CSS imports, no Tailwind, no styled-components; project is unstyled |
+| No global CSS or reset | ⚠️ Identified | `src/main.jsx`: Does not import any CSS file; `index.html` has no linked stylesheet |
+| PageNav lacks visual styling | ℹ️ Identified | `src/components/PageNav.jsx:4-17`: `<nav>`, `<ul>`, `<li>` have no `className` or inline styles |
+| NavLink active class has no styles | ℹ️ Identified | `src/components/PageNav.jsx:7-14`: `NavLink` adds `.active` but no CSS targets it |
+
+---
+
+### 🧱 208.4 Pending Fixes (TODO)
+
+- [ ] Choose a styling approach for the project (e.g. CSS Modules, Tailwind, or a single global CSS file) and add the necessary setup (e.g. `npm install -D tailwindcss` or create `src/index.css`)
+- [ ] Add global styles: create `src/index.css` (or `src/App.css`) and import it in `src/main.jsx` — include at least a basic reset and typography
+- [ ] Apply initial styling to `PageNav` in `src/components/PageNav.jsx`: add `className` or inline styles for layout (e.g. flex/grid for nav items) and spacing
+- [ ] Add CSS for the `NavLink` active state: define `.active` (or `[aria-current="page"]`) styles in the chosen styling system so the current route is visually highlighted
+- [ ] Consider adding `aria-label` to `<nav>` in `src/components/PageNav.jsx` (line 5) and `end` prop to `<NavLink to="/">` (line 8) as noted in Lesson 207 — these complement styling improvements
+
+[↑ top — 208. Lesson 208 — *Styling Options For React Applications*](#-208-lesson-208--styling-options-for-react-applications)
 
 
 

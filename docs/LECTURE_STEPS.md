@@ -305,11 +305,11 @@ In the meantime in `package.json` file:
 
 ```jsx
 /* src/App.jsx */
-import { BrowserRouter, Routes } from "react-router-dom";
+import { BrowserRouter, Routes } from "react-router-dom";   // 👈🏽 ✅ (1)
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <BrowserRouter>                                         {/* 👈🏽 ✅ (2) */}
+      <Routes>                                              {/* 👈🏽 ✅ (2) */}
 
       </Routes>
     </BrowserRouter>
@@ -330,18 +330,18 @@ export default App;
 
 ```jsx
 /* src/App.jsx */
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Product from "./pages/Product";
-import Pricing from "./pages/Pricing";
-import Homepage from "./pages/Homepage";
+import { BrowserRouter, Routes, Route } from "react-router-dom";        // 👈🏽 ✅ (1) import "route"
+import Product from "./pages/Product";                                  // 👈🏽 ✅ (2)
+import Pricing from "./pages/Pricing";                                  // 👈🏽 ✅ (2)
+import Homepage from "./pages/Homepage";                                // 👈🏽 ✅ (2)
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Homepage />} />
-        <Route path="product" element={<Product />} />
-        <Route path="pricing" element={<Pricing />} />
+        <Route path="/" element={<Homepage />} />                       {/* 👈🏽 ✅ (3) */}
+        <Route path="product" element={<Product />} />                  {/* 👈🏽 ✅ (3) */}
+        <Route path="pricing" element={<Pricing />} />                  {/* 👈🏽 ✅ (3) */}
       </Routes>
     </BrowserRouter>
   );
@@ -385,7 +385,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Product from "./pages/Product";
 import Pricing from "./pages/Pricing";
 import Homepage from "./pages/Homepage";
-import PageNotFound from "./pages/PageNotFound";
+import PageNotFound from "./pages/PageNotFound";                                  // 👈🏽 ✅ (1)
 
 function App() {
   return (
@@ -394,7 +394,7 @@ function App() {
         <Route path="/" element={<Homepage />} />
         <Route path="/product" element={<Product />} />
         <Route path="/pricing" element={<Pricing />} />
-        <Route path="*" element={<PageNotFound />} />
+        <Route path="*" element={<PageNotFound />} />                             {/* 👈🏽 ✅ (2) */}
       </Routes>
     </BrowserRouter>
   );
@@ -418,18 +418,343 @@ export default App;
 
 ### 🧱 206.4 Pending Fixes (TODO)
 
-- [ ] Create `docs/img/` folder and add screenshots `section17-lecture206-001.png` (Homepage/Product/Pricing) and `section17-lecture206-002.png` (Page Not Found) if images are intended for documentation
 - [ ] Optionally update `src/App.jsx` route paths to `path="/product"` and `path="/pricing"` for consistency with `path="/"` (lines 12–13)
 - [ ] When implementing real page content, add appropriate `aria-label` and semantic markup to page components in `src/pages/`
 
 [↑ top — 206. Lesson 206 — *Implementing Main Pages and Routes*](#-206-lesson-206--implementing-main-pages-and-routes)
 
 
+<br>
+
+## 🔧 207. Lesson 207 — *Linking Between Routes With `<Link />` and `<NavLink />`*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [207. Lesson 207 — *Linking Between Routes With `<Link />` and `<NavLink />`*](#-207-lesson-207--linking-between-routes-with-link--and-navlink-)
+- [207.1 Context](#-2071-context)
+- [207.2 Updating code according the context](#-2072-updating-codetheory-according-the-context)
+  - [207.2.1 Anchor Tag Causes Full Page Reload](#20721-anchor-tag-causes-full-page-reload)
+  - [207.2.2 Replacing Anchor with Link for Client-Side Navigation](#20722-replacing-anchor-with-link-for-client-side-navigation)
+  - [207.2.3 Creating PageNav Component with Link](#20723-creating-pagenav-component-with-link)
+  - [207.2.4 Adding PageNav to Homepage](#20724-adding-pagenav-to-homepage)
+  - [207.2.5 Adding PageNav to PageNotFound](#20725-adding-pagenav-to-pagenotfound)
+  - [207.2.6 Adding PageNav to Product Page](#20726-adding-pagenav-to-product-page)
+  - [207.2.7 Adding PageNav to Pricing Page](#20727-adding-pagenav-to-pricing-page)
+  - [207.2.8 Using NavLink for Active State Styling](#20728-using-navlink-for-active-state-styling)
+- [207.3 Issues](#-2073-issues)
+- [207.4 Pending Fixes (TODO)](#-2074-pending-fixes-todo)
+
+### 🧠 207.1 Context:
+
+**Linking Between Routes** is the practice of navigating between different views in a React SPA without triggering a full page reload. Instead of using native HTML `<a href="...">` anchors (which cause the browser to request a new document from the server), React Router provides `<Link>` and `<NavLink>` components that perform **client-side navigation**: they update the URL and swap the rendered component while keeping the app state and avoiding a full reload.
+
+In the Worldwise project, we use `Link` for in-page navigation (e.g. a "Pricing" link on the Homepage) and `NavLink` inside a shared `PageNav` component. `NavLink` automatically applies an `active` class (or custom styling) to the current route's link, enabling visual feedback such as highlighting the active nav item.
+
+**Key Concepts:**
+
+1. **`<Link to="...">`** — A React Router component that renders an `<a>` tag but intercepts clicks to perform client-side navigation via the History API. No full page reload occurs.
+2. **`<NavLink>`** — An enhanced `Link` that adds an `active` class (or custom `className`/`style` functions) when its `to` path matches the current URL. Essential for navigation UIs where the current page should be visually distinct.
+3. **`to` prop** — Accepts a string path (e.g. `"/pricing"`) or a location object. Must be used instead of `href` for React Router links.
+4. **Shared navigation component** — A reusable `PageNav` component containing `NavLink` items ensures consistent navigation across all pages and centralizes route definitions.
+5. **Avoid `href` for internal routes** — Using `<a href="/path">` triggers a full reload; always use `<Link to="/path">` for routes handled by React Router.
+
+**Advantages:**
+- No full page reloads; faster, smoother navigation.
+- Preserves React state and component tree; no flicker or re-initialization.
+- `NavLink` simplifies active-state styling for nav menus.
+- Better UX for SPAs; feels like a native app.
+- Browser back/forward and direct URL access work correctly when routing is configured.
+
+**Disadvantages / Gotchas:**
+- Must remember to use `Link`/`NavLink` instead of `<a>` for internal routes; easy to slip back to anchors.
+- `NavLink` exact matching: by default it uses partial matching; `end` prop ensures exact match for the root `/` route.
+- Duplicating `PageNav` in every page component can be tedious; consider lifting it to a layout or `App.jsx`.
+- External links (to other domains) should still use `<a href="..." target="_blank" rel="noopener noreferrer">`.
+
+**When to Consider Alternatives:**
+- For external URLs — use `<a href="...">` with appropriate `rel` attributes.
+- For programmatic navigation (e.g. after form submit) — use `useNavigate()` hook.
+- For custom active styling beyond a simple class — use `NavLink`'s `className` or `style` as a function.
+- When using nested routes — ensure `NavLink` paths match the route structure correctly.
+
+In Worldwise, we replace the initial `<a href="/pricing">` with `<Link to="/pricing">`, build a `PageNav` component with links to Home, Product, and Pricing, add `PageNav` to all pages, and finally switch to `NavLink` in `PageNav` to enable future active-state styling.
+
+---
+
+### ⚙️ 207.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section 207.2 demonstrates how to replace native anchor tags with React Router's `Link` and `NavLink` for client-side navigation.
+- It solves the problem of full page reloads when navigating between routes; anchors cause reloads, whereas `Link` and `NavLink` perform in-app navigation.
+- Subsections 207.2.1–207.2.2 show the anchor vs. `Link` contrast on the Homepage; 207.2.3 creates the `PageNav` component; 207.2.4–207.2.7 add `PageNav` to all pages; 207.2.8 replaces `Link` with `NavLink` in `PageNav` for active-state styling.
+- The images illustrate each step: Homepage with anchor, Homepage with Link, Homepage with PageNav, and NavLink with active class.
+
+---
+
+#### 207.2.1 Anchor Tag Causes Full Page Reload
+
+**Subsection Summary:**
+- Uses a native `<a href="/pricing">Pricing</a>` anchor on the Homepage.
+- Demonstrates the problem: clicking the link triggers a full page reload because the browser requests a new document.
+- The image `section17-lecture207-001.png` shows the Homepage with the anchor tag; this approach defeats the SPA experience.
+- Establishes why we need React Router's `Link` for internal navigation.
+
+* reloading page in order to move to Pricing page.
+
+```jsx
+/* src/pages/Homepage.jsx */
+const Homepage = () => {
+  return (
+    <>
+      <h1>Worldwise page</h1>
+      <a href="/pricing">Pricing</a>
+    </>
+  );
+};
+
+export default Homepage;
+```
+
+![Homepage with anchor tag](../img/section17-lecture207-001.png)
+
+---
+
+#### 207.2.2 Replacing Anchor with Link for Client-Side Navigation
+
+**Subsection Summary:**
+- Imports `Link` from `react-router-dom` and replaces `<a href="/pricing">` with `<Link to="/pricing">`.
+- Enables client-side navigation: clicking "Pricing" updates the URL and renders the Pricing component without a full reload.
+- The image `section17-lecture207-001.png` is reused to show the Homepage with the `Link` component (visually similar, but behavior differs).
+- Core pattern: use `to` instead of `href` for routes handled by React Router.
+
+```jsx
+/* src/pages/Homepage.jsx */
+import { Link } from "react-router-dom";        // 👈🏽 ✅ (1)
+
+const Homepage = () => {
+  return (
+    <>
+      <h1>Worldwise page</h1>
+      <Link to="/pricing">Pricing</Link>        {/* 👈🏽 ✅ (2) */}
+    </>
+  );
+};
+
+export default Homepage;
+```
+
+![Homepage with link tag](../img/section17-lecture207-001.png)
+
+---
+
+#### 207.2.3 Creating PageNav Component with Link
+
+**Subsection Summary:**
+- Creates `PageNav` in `src/components/PageNav.jsx` with a semantic `<nav>` and unordered list.
+- Uses `Link` for Home (`/`), Product (`/product`), and Pricing (`/pricing`).
+- Centralizes navigation links in one component for reuse across pages.
+- Establishes the structure that will later use `NavLink` for active-state styling.
+
+```jsx
+/* src/components/PageNav.jsx */
+import { Link } from "react-router-dom";
+
+const PageNav = () => {
+  return (
+    <nav>
+      <ul>
+        <li>
+          <Link to="/">Home</Link>
+        </li>
+        <li>
+          <Link to="/product">Product</Link>
+        </li>
+        <li>
+          <Link to="/pricing">Pricing</Link>
+        </li>
+      </ul>
+    </nav>
+  );
+};
+
+export default PageNav;
+```
+
+---
+
+#### 207.2.4 Adding PageNav to Homepage
+
+**Subsection Summary:**
+- Imports and renders `PageNav` at the top of the Homepage component.
+- Keeps the existing `<Link to="/pricing">` in the page body (redundant with PageNav but illustrative).
+- The image `section17-lecture207-002.png` shows the Homepage with the PageNav component visible.
+- Ensures users can navigate to Product and Pricing from the landing page.
+
+```jsx
+/* src/pages/Homepage.jsx */
+import { Link } from "react-router-dom";
+import PageNav from "../components/PageNav";            // 👈🏽 ✅ (1)
+
+const Homepage = () => {
+  return (
+    <>
+      <PageNav />                                        {/* 👈🏽 ✅ (2) */}
+      <h1>Worldwise page</h1>
+      <Link to="/pricing">Pricing</Link>
+    </>
+  );
+};
+
+export default Homepage;
+```
+
+![Homepage with PageNav component](../img/section17-lecture207-002.png)
+
+---
+
+#### 207.2.5 Adding PageNav to PageNotFound
+
+**Subsection Summary:**
+- Imports and adds `PageNav` to the PageNotFound component.
+- Allows users on a 404 page to navigate back to Home, Product, or Pricing without typing the URL.
+- The image `section17-lecture207-003.png` shows the NotFound page with PageNav.
+- Improves UX: 404 pages should still offer a way to get back into the app.
+
+```jsx
+/* src/pages/PageNotFound.jsx */
+import PageNav from "../components/PageNav";                      // 👈🏽 ✅ (1)
+
+const PageNotFound = () => {
+  return (
+    <>
+      <PageNav />                                                 {/* 👈🏽 ✅ (2) */}
+      <h1>Page not found 🥹</h1>
+    </>
+  );
+};
+
+export default PageNotFound;
+```
+![NotFoundPage with PageNav component](../img/section17-lecture207-003.png)
+
+---
+
+#### 207.2.6 Adding PageNav to Product Page
+
+**Subsection Summary:**
+- Imports and adds `PageNav` to the Product page component.
+- Provides consistent navigation from the Product view to Home, Product, and Pricing.
+- The image `section17-lecture207-004.png` shows the Product page with PageNav.
+- Follows the same pattern as Homepage and PageNotFound for consistency.
+
+```jsx
+/* src/pages/Product.jsx */
+import PageNav from "../components/PageNav";                      // 👈🏽 ✅ (1)
+const Product = () => {
+  return (
+    <>
+      <PageNav />                                                 {/* 👈🏽 ✅ (2) */}
+      <h1>Product</h1>
+    </>
+  );
+};
+
+export default Product;
+```
+
+![Product page with PageNav component](../img/section17-lecture207-004.png)
+
+---
+
+#### 207.2.7 Adding PageNav to Pricing Page
+
+**Subsection Summary:**
+- Imports and adds `PageNav` to the Pricing page component.
+- Completes the navigation pattern across all main pages.
+- The image `section17-lecture207-005.png` shows the Pricing page with PageNav.
+- Ensures users can navigate between all routes from any page.
+
+```jsx
+/* src/pages/Pricing.jsx */
+import PageNav from "../components/PageNav";                      //  👈🏽 ✅ (1)
+const Pricing = () => {
+  return (
+    <>
+      <PageNav />                                                 {/*  👈🏽 ✅ (2) */}
+      <h1>Pricing</h1>
+    </>
+  );
+};
+
+export default Pricing;
+```
+![Pricing page with PageNav component](../img/section17-lecture207-005.png)
+
+---
+
+#### 207.2.8 Using NavLink for Active State Styling
+
+**Subsection Summary:**
+- Replaces `Link` with `NavLink` in `PageNav` for all three nav items.
+- `NavLink` automatically adds `class="active"` to the link whose route matches the current URL.
+- The image `section17-lecture207-006.png` illustrates the NavLink component and active state.
+- Enables future CSS styling (e.g. bold, underline, background) for the active nav item; `className` or `style` props can customize the active appearance.
 
 
+```jsx
+/* src/components/PageNav.jsx */
+import { Link, NavLink } from "react-router-dom";                           // 👈🏽 ✅ (1)
 
+const PageNav = () => {
+  return (
+    <nav>
+      <ul>
+        <li>
+          <NavLink to="/">Home</NavLink>                                    {/* 👈🏽 ✅ (2) */}
+        </li>
+        <li>
+          <NavLink to="/product">Product</NavLink>                          {/* 👈🏽 ✅ (2) */}
+        </li>
+        <li>
+          <NavLink to="/pricing">Pricing</NavLink>                          {/* 👈🏽 ✅ (2) */}
+        </li>
+      </ul>
+    </nav>
+  );
+};
 
+export default PageNav;
+```
+![Adding NavLink component](../img/section17-lecture207-006.png)
 
+---
+
+### 🐞 207.3 Issues:
+
+- **PageNav duplicated across all pages**: Each page (Homepage, Product, Pricing, PageNotFound) imports and renders `PageNav` individually; this works but creates redundancy. Consider lifting `PageNav` to `App.jsx` or a layout component.
+- **Accessibility: nav lacks `aria-label`**: The `<nav>` element in `PageNav` should have an `aria-label` (e.g. `aria-label="Main navigation"`) so screen readers can identify its purpose.
+- **NavLink root route matching**: `NavLink to="/"` matches any path that starts with `/` (e.g. `/product`, `/pricing`); adding `end` prop ensures only the exact root path gets the active class.
+- **Redundant Link on Homepage**: `Homepage` includes both `PageNav` and a standalone `<Link to="/pricing">Pricing</Link>`, which duplicates the Pricing link; consider removing if not intentional.
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| PageNav duplicated in every page | ℹ️ Low Priority | `src/pages/Homepage.jsx`, `Product.jsx`, `Pricing.jsx`, `PageNotFound.jsx`: Each imports and renders `PageNav`; consider layout in `App.jsx` |
+| nav element missing aria-label | ⚠️ Identified | `src/components/PageNav.jsx:5`: `<nav>` should include `aria-label="Main navigation"` for accessibility |
+| NavLink for root path may match child routes | ⚠️ Identified | `src/components/PageNav.jsx:8`: `<NavLink to="/">` should use `end` prop: `<NavLink to="/" end>Home</NavLink>` |
+| Redundant Pricing link on Homepage | ℹ️ Informational | `src/pages/Homepage.jsx:9`: `<Link to="/pricing">` duplicates PageNav; remove if not needed for CTA |
+
+---
+
+### 🧱 207.4 Pending Fixes (TODO)
+
+- [ ] Add `aria-label="Main navigation"` to the `<nav>` element in `src/components/PageNav.jsx` (line 5) for screen reader accessibility
+- [ ] Add `end` prop to `<NavLink to="/">` in `src/components/PageNav.jsx` (line 8) so only the root path receives the active class: `<NavLink to="/" end>Home</NavLink>`
+- [ ] Consider moving `PageNav` to `App.jsx` as a shared layout component to avoid importing it in every page
+- [ ] Remove redundant `<Link to="/pricing">Pricing</Link>` from `src/pages/Homepage.jsx` (line 9) if the PageNav already provides sufficient navigation
+
+[↑ top — 207. Lesson 207 — *Linking Between Routes With `<Link />` and `<NavLink />`*](#-207-lesson-207--linking-between-routes-with-link--and-navlink-)
 
 
 

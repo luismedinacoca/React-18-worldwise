@@ -1,0 +1,22 @@
+.nav {
+  background-color: sandybrown
+}
+
+.nav ul {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+}
+
+.nav :global(.active) {
+  background-color: green;
+  color: greenyellow;
+  padding: 0.25rem 1.75rem;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: none;
+}
+
+:global(.test) {
+  background-color: red;
+}

@@ -863,6 +863,616 @@ The five main approaches are: **inline CSS**, **CSS/Sass files**, **CSS Modules*
 [↑ top — 208. Lesson 208 — *Styling Options For React Applications*](#-208-lesson-208--styling-options-for-react-applications)
 
 
+<br>
+
+## 🔧 209. Lesson 209 — *Using CSS Modules*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [209. Lesson 209 — *Using CSS Modules*](#-209-lesson-209--using-css-modules)
+- [209.1 Context](#-2091-context)
+- [209.2 Updating code/theory according the context](#-2092-updating-codetheory-according-the-context)
+  - [209.2.1 PageNav CSS Module File](#20921-pagenav-css-module-file)
+  - [209.2.2 PageNav Component Using CSS Module](#20922-pagenav-component-using-css-module)
+  - [209.2.3 AppLayout Page Component](#20923-applayout-page-component)
+  - [209.2.4 App Route Configuration with AppLayout](#20924-app-route-configuration-with-applayout)
+  - [209.2.5 Homepage Link to App Layout](#20925-homepage-link-to-app-layout)
+  - [209.2.6 AppNav Component](#20926-appnav-component)
+  - [209.2.7 AppLayout with AppNav](#20927-applayout-with-appnav)
+  - [209.2.8 AppNav CSS Module File](#20928-appnav-css-module-file)
+  - [209.2.9 AppNav Using CSS Module](#20929-appnav-using-css-module)
+  - [209.2.10 Homepage with Both Navigation Components](#209210-homepage-with-both-navigation-components)
+  - [209.2.11 Global index.css Styles](#209211-global-indexcss-styles)
+  - [209.2.12 Importing Global CSS in main.jsx](#209212-importing-global-css-in-mainjsx)
+  - [209.2.13 :global() Selector for Unscoped Styles](#209213-global-selector-for-unscoped-styles)
+  - [209.2.14 Applying Global Class in Homepage](#209214-applying-global-class-in-homepage)
+  - [209.2.15 NavLink Active Class Not Working](#209215-navlink-active-class-not-working)
+  - [209.2.16 Using :global(.active) for NavLink Active State](#209216-using-globalactive-for-navlink-active-state)
+- [209.3 Issues](#-2093-issues)
+- [209.4 Pending Fixes (TODO)](#-2094-pending-fixes-todo)
+
+### 🧠 209.1 Context:
+
+**CSS Modules** is a build-time feature that scopes CSS class names to the component that imports them. Instead of global CSS (where `.button` in one file can conflict with `.button` in another), each CSS Module generates unique, hashed class names (e.g. `PageNav_nav_a3f2k`) so styles are isolated per component. This eliminates naming collisions and makes styles predictable and maintainable.
+
+In the Worldwise project, we use CSS Modules for both `PageNav` and `AppNav` components. Each component has a companion `.module.css` file (e.g. `PageNav.module.css`). We import the generated class names as a JavaScript object (`import styles from "./PageNav.module.css"`) and apply them via `className={styles.nav}`. For third-party or dynamically added classes (such as React Router's `active` class on `NavLink`), we use the `:global()` wrapper so the class is not hashed and stays globally available.
+
+**Key Concepts:**
+
+1. **Module file convention** — CSS Modules use the `.module.css` suffix (e.g. `PageNav.module.css`). The bundler (Vite) detects this convention and processes the file.
+2. **Scoped class names** — Selectors like `.nav` become `.PageNav_nav_a3f2k` (or similar) at build time. Only the importing component can use them.
+3. **Import as object** — `import styles from "./PageNav.module.css"` yields an object: `{ nav: "PageNav_nav_a3f2k", list: "PageNav_list_x9k2m" }`. Use `className={styles.nav}`.
+4. **Named imports** — `import { nav } from "./AppNav.module.css"` is also valid; it imports the hashed value of `.nav` directly.
+5. **:global()** — Wraps selectors that must remain unscoped. Use `:global(.active)` when targeting classes added by libraries (e.g. React Router's `active` on `NavLink`).
+6. **Global CSS variables** — `:root` variables in `index.css` are available everywhere; CSS Modules can use `var(--color-brand--1)` etc.
+
+**Advantages:**
+- No naming collisions; each component's styles are isolated.
+- Standard CSS syntax; no new language or runtime.
+- Works with Vite out of the box; no extra configuration.
+- Co-location: each component has its own `.module.css` next to it.
+- Easy to combine with global styles (reset, typography, variables).
+
+**Disadvantages / Gotchas:**
+- Requires the `.module.css` naming convention; teams must adopt it consistently.
+- Third-party classes (e.g. `active` from NavLink) need `:global()` to be targeted.
+- Composing classes or dynamic class names requires `className={`${styles.nav} ${styles.active}`}` or similar.
+- No built-in theming; rely on CSS variables or additional tooling.
+
+**When to Consider Alternatives:**
+- For very small apps — a single global CSS file may be sufficient.
+- When using Tailwind — utility classes provide similar component-level granularity without Modules.
+- For heavy theming or dynamic styles — CSS-in-JS (Styled Components, Emotion) might be preferable.
+- When integrating UI libraries (MUI, Chakra) — they bring their own styling; CSS Modules may overlap.
+
+In Worldwise, we apply CSS Modules to `PageNav` and `AppNav`, add global styles via `index.css`, and use `:global(.active)` to style the active navigation link from React Router's `NavLink`.
+
+---
+
+### ⚙️ 209.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section 209.2 demonstrates how to implement CSS Modules in the Worldwise app for component-scoped styling.
+- It solves global CSS conflicts by scoping styles to `PageNav` and `AppNav`, and shows how to target third-party classes (e.g. `active` from `NavLink`) using `:global()`.
+- Subsections 209.2.1–209.2.2 set up PageNav with a CSS Module; 209.2.3–209.2.7 introduce AppLayout and AppNav with their own Module; 209.2.8–209.2.10 apply AppNav styles and show both navs together; 209.2.11–209.2.12 add global `index.css`; 209.2.13–209.2.16 explain `:global()` and fix NavLink active styling.
+- Images illustrate each step: PageNav with Module, AppNav styled, both navs, global styles, test global class, active not working, and active working with `:global(.active)`.
+
+---
+
+#### 209.2.1 PageNav CSS Module File
+
+**Subsection Summary:**
+- Creates `src/components/PageNav.module.css` with `.nav` and `ul` selectors.
+- `.nav` sets `background-color: sandybrown`; `ul` gets flex layout with `list-style: none`, `display: flex`, `justify-content: space-between`.
+- Establishes the CSS Module file that will be imported by PageNav.
+- Note: `ul` is a bare selector; in CSS Modules it gets hashed. Later the structure changes to `.nav ul` for nested styling.
+```css
+/* src/components/PageNav.module.css */
+.nav {
+  background-color: sandybrown
+}
+
+ul {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+}
+```
+
+#### 209.2.2 PageNav Component Using CSS Module
+
+**Subsection Summary:**
+- Imports the CSS Module as `styles` from `PageNav.module.css` and applies `className={styles.nav}` to the nav element.
+- Uses `className={styles.list}` on the `ul` for the flex layout (requires a `.list` class in the Module, or use `.nav ul` in CSS).
+- Demonstrates the standard pattern: `import styles from "./Component.module.css"` and `className={styles.className}`.
+- The image `section17-lecture209-001.png` shows the PageNav with sandybrown background and styled list after applying the CSS Module.
+
+```jsx
+/* src/components/PageNav.jsx */
+import { Link, NavLink } from "react-router-dom";
+
+import styles from "./PageNav.module.css";
+
+const PageNav = () => {
+  return (
+    <nav className={styles.nav}>
+      <ul className={styles.list}>
+        <li>
+          <NavLink to="/">Home</NavLink>
+        </li>
+        <li>
+          <NavLink to="/product">Product</NavLink>
+        </li>
+        <li>
+          <NavLink to="/pricing">Pricing</NavLink>
+        </li>
+      </ul>
+    </nav>
+  );
+};
+
+export default PageNav;
+```
+
+![PageNave.module.css added in PageNav component](../img/section17-lecture209-001.png)
+
+---
+
+#### 209.2.3 AppLayout Page Component
+
+**Subsection Summary:**
+- Creates the `AppLayout` component in `src/pages/AppLayout.jsx` as a placeholder for the app section.
+- Renders a simple `<div>App Layout</div>`; will later contain `AppNav` and nested routes.
+- Establishes the structure for the `/app` route that will wrap app-specific views.
+
+```jsx
+/* src/pages/AppLayout.jsx */
+const AppLayout = () => {
+  return <div>App Layout</div>;
+};
+
+export default AppLayout;
+```
+
+---
+
+#### 209.2.4 App Route Configuration with AppLayout
+
+**Subsection Summary:**
+- Imports `AppLayout` and adds a `<Route path="/app" element={<AppLayout />} />` in `App.jsx`.
+- Enables navigation to `/app` for the app-specific layout and future nested routes.
+- Keeps the existing routes for Homepage, Product, Pricing, and PageNotFound.
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";                      // 👈🏽 ✅ (1)
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/product" element={<Product />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/app" element={<AppLayout />} />           {/* 👈🏽 ✅ (2) */}
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+---
+
+#### 209.2.5 Homepage Link to App Layout
+
+**Subsection Summary:**
+- Updates Homepage to include `PageNav` and a `<Link to="/app">Go to the App Layout</Link>`.
+- Replaces or comments out the previous `<Link to="/pricing">`; demonstrates navigation to the new app section.
+- Prepares for the distinction between marketing pages (Home, Product, Pricing) and the app area (`/app`).
+
+```jsx
+/* src/pages/Homepage.jsx */
+import { Link } from "react-router-dom";
+import PageNav from "../components/PageNav";          // 👈🏽 ✅ (1)
+
+const Homepage = () => {
+  return (
+    <>
+      <PageNav />                                     {/* 👈🏽 ✅ (2) */}
+      <h1>Worldwise page</h1>
+      {/* <Link to="/pricing">Pricing</Link> */}
+      <Link to="/app">Go to the App Layout</Link>
+    </>
+  );
+};
+
+export default Homepage;
+```
+
+---
+
+#### 209.2.6 AppNav Component
+
+**Subsection Summary:**
+- Creates `AppNav` in `src/components/AppNav.jsx` with a semantic `<nav>` and empty `<ul>`.
+- Serves as the app-specific navigation (distinct from `PageNav` for marketing pages).
+- Will be used inside `AppLayout` and styled via its own CSS Module in subsequent steps.
+
+```jsx
+/* src/components/AppNav.jsx */
+const AppNav = () => {
+  return (
+    <nav>
+      App Navigation
+      <ul></ul>
+    </nav>
+  );
+};
+
+export default AppNav;
+```
+
+---
+
+#### 209.2.7 AppLayout with AppNav
+
+**Subsection Summary:**
+- Imports `AppNav` into `AppLayout` and renders it above the layout content.
+- Provides a consistent app navigation bar for routes under `/app`.
+- Demonstrates composing layout components (AppLayout wraps AppNav and main content).
+
+```jsx
+/* src/pages/AppLayout.jsx */
+import AppNav from "../components/AppNav";          // 👈🏽 ✅ (1)
+const AppLayout = () => {
+  return (
+    <div>
+      <AppNav />                                    {/* 👈🏽 ✅ (2) */}
+      <p>App Layout</p>
+    </div>
+  );
+};
+
+export default AppLayout;
+```
+
+---
+
+#### 209.2.8 AppNav CSS Module File
+
+**Subsection Summary:**
+- Creates `src/components/AppNav.module.css` with a `.nav` class.
+- Sets `background-color: lightblue` to differentiate AppNav visually from PageNav (sandybrown).
+- Both nav components can use `.nav` without conflict because CSS Modules scope the names per file.
+
+```css
+/* src/components/AppNav.module.css */
+.nav {
+  background-color: lightblue;
+}
+```
+
+---
+
+#### 209.2.9 AppNav Using CSS Module
+
+**Subsection Summary:**
+- Uses named import `import { nav } from "./AppNav.module.css"` to get the hashed class for `.nav`.
+- Applies `className={nav}` to the `<nav>` element so AppNav receives the lightblue background.
+- Demonstrates an alternative to `import styles from` — named imports work when you need only specific classes.
+- The image `section17-lecture209-002.png` shows AppNav with the lightblue styling applied.
+
+```jsx
+/* src/components/AppNav.jsx */
+import { nav } from "./AppNav.module.css";            // 👈🏽 ✅
+
+const AppNav = () => {
+  return (
+    <nav className={nav}>
+      App Navigation
+      <ul></ul>
+    </nav>
+  );
+};
+
+export default AppNav;
+```
+
+![AppNav with CSS Module styling](../img/section17-lecture209-002.png)
+
+---
+
+#### 209.2.10 Homepage with Both Navigation Components
+
+**Subsection Summary:**
+- Adds `AppNav` alongside `PageNav` to the Homepage for demonstration purposes.
+- Shows that both components can use the same class name `.nav` in their respective Modules without conflict — each gets a unique hashed class.
+- The image `section17-lecture209-003.png` illustrates both navigation bars with distinct backgrounds (sandybrown and lightblue) on the same page.
+
+```jsx
+/* src/pages/Homepage.jsx */
+import { Link } from "react-router-dom";
+import PageNav from "../components/PageNav";
+import AppNav from "../components/AppNav";            // 👈🏽 ✅ (1)
+
+const Homepage = () => {
+  return (
+    <>
+      <PageNav />
+      <AppNav />                                      {/* 👈🏽 ✅ (2) */}
+      <h1>Worldwise page</h1>
+      {/* <Link to="/pricing">Pricing</Link> */}
+      <Link to="/app">Go to the App Layout</Link>
+    </>
+  );
+};
+
+export default Homepage;
+```
+
+![both components have nav as style](../img/section17-lecture209-003.png)
+
+---
+
+#### 209.2.11 Global index.css Styles
+
+**Subsection Summary:**
+- Creates or updates `src/index.css` with global styles: Leaflet CSS, Manrope font, CSS variables (`:root`), reset, typography, form elements, and CTA styles.
+- CSS variables (e.g. `--color-brand--1`, `--color-dark--1`) are available in all CSS Modules via `var(--variable-name)`.
+- Source: [index.css repo link](https://github.com/jonasschmedtmann/ultimate-react-course/blob/main/11-worldwise/starter/index.css)
+
+```css
+/* src/index.css */
+/* Taken from getting started guide at: https://leafletjs.com/examples/quick-start/ */
+@import "https://unpkg.com/leaflet@1.7.1/dist/leaflet.css";
+@import "https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap";
+
+/* These CSS variables are global, so they are available in all CSS modules */
+:root {
+  --color-brand--1: #ffb545;
+  --color-brand--2: #00c46a;
+
+  --color-dark--0: #242a2e;
+  --color-dark--1: #2d3439;
+  --color-dark--2: #42484d;
+  --color-light--1: #aaa;
+  --color-light--2: #ececec;
+  --color-light--3: #d6dee0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: inherit;
+}
+
+html {
+  font-size: 62.5%;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Manrope", sans-serif;
+  color: var(--color-light--2);
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+label {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 0.8rem 1.2rem;
+  font-family: inherit;
+  font-size: 1.6rem;
+  border: none;
+  border-radius: 5px;
+  background-color: var(--color-light--3);
+  transition: all 0.2s;
+}
+
+input:focus {
+  outline: none;
+  background-color: #fff;
+}
+
+.cta:link,
+.cta:visited {
+  display: inline-block;
+  background-color: var(--color-brand--2);
+  color: var(--color-dark--1);
+  text-transform: uppercase;
+  text-decoration: none;
+  font-size: 1.6rem;
+  font-weight: 600;
+  padding: 1rem 3rem;
+  border-radius: 5px;
+}
+
+/*
+"importCSSModule": {
+    "prefix": "csm",
+    "scope": "javascript,typescript,javascriptreact",
+    "body": ["import styles from './${TM_FILENAME_BASE}.module.css'"],
+    "description": "Import CSS Module as `styles`"
+  },
+*/
+```
+
+---
+
+#### 209.2.12 Importing Global CSS in main.jsx
+
+**Subsection Summary:**
+- Adds `import "./index.css"` in `src/main.jsx` so global styles apply to the entire app.
+- The import order ensures global styles load before the app renders; CSS Modules still scope their own classes.
+- The image `section17-lecture209-004.png` shows the app after global styles (Manrope font, colors, reset) are applied.
+
+```jsx
+/* src/main.jsx */
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+import "./index.css";                                     // 👈🏽 ✅
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
+```
+
+![after global style](../img/section17-lecture209-004.png)
+
+---
+
+#### 209.2.13 :global() Selector for Unscoped Styles
+
+**Subsection Summary:**
+- Adds `:global(.test)` to `PageNav.module.css` to demonstrate how to target a class that is not hashed by the Module.
+- `:global(.className)` keeps the selector globally available; useful when you need to style elements with fixed class names (e.g. from libraries or shared markup).
+- Answers the question: *How can we use a module style class as a global style?* — by wrapping the selector in `:global()`.
+
+```css
+/* src/components/PageNav.module.css */
+.nav {
+  background-color: sandybrown
+}
+
+.nav ul {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+}
+
+:global(.test) {                                            // 👈🏽 ✅
+  background-color: red;
+}
+```
+
+---
+
+#### 209.2.14 Applying Global Class in Homepage
+
+**Subsection Summary:**
+- Adds `className="test"` to the `<h1>` in Homepage so it receives the red background from `:global(.test)` in PageNav.module.css.
+- Demonstrates that `:global(.test)` applies to any element with `class="test"` anywhere in the app, even though the rule lives in a CSS Module.
+- The image `section17-lecture209-005.png` shows the h1 with the red background from the global test class.
+
+```jsx
+/* src/pages/Homepage.jsx */
+import { Link } from "react-router-dom";
+import PageNav from "../components/PageNav";
+import AppNav from "../components/AppNav";
+
+const Homepage = () => {
+  return (
+    <>
+      <PageNav />
+      <AppNav />
+      <h1 className="test">Worldwise page</h1>              {/* 👈🏽 ✅ */}
+      {/* <Link to="/pricing">Pricing</Link> */}
+      <Link to="/app">Go to the App Layout</Link>
+    </>
+  );
+};
+
+export default Homepage;
+```
+
+![test global style](../img/section17-lecture209-005.png)
+
+---
+
+#### 209.2.15 NavLink Active Class Not Working
+
+**Subsection Summary:**
+- Attempts to style the active NavLink with `.nav .active` in PageNav.module.css.
+- **Problem**: In CSS Modules, `.active` is hashed to something like `PageNav_active_x9k2m`, but React Router's `NavLink` adds the literal class `active` (unhashed) to the DOM. The selector `.nav .active` expects the hashed version, so it does not match.
+- The image `section17-lecture209-006.png` shows that the active link styling is not applied.
+
+```css
+/* src/components/PageNav.module.css - .nav .active does NOT work for NavLink */
+.nav {
+  background-color: sandybrown
+}
+
+.nav ul {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+}
+
+.nav .active {                                                  // 👈🏽 ✅
+  background-color: green;
+  color: greenyellow;
+  padding: 0.25rem 1.75rem;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: none;
+}
+
+:global(.test) {
+  background-color: red;
+}
+```
+
+![active class not working](../img/section17-lecture209-006.png)
+
+---
+
+#### 209.2.16 Using :global(.active) for NavLink Active State
+
+**Subsection Summary:**
+- Replaces `.nav .active` with `.nav :global(.active)` so the `.active` class is not hashed and matches the class React Router adds to the DOM.
+- The active NavLink now receives the green background, greenyellow text, padding, and border-radius.
+- The image `section17-lecture209-007.png` illustrates the working active state styling for the current route.
+
+```css
+/* src/components/PageNav.module.css */
+.nav {
+  background-color: sandybrown;
+}
+
+.nav ul {
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+}
+
+.nav :global(.active) {                                           // 👈🏽 ✅
+  background-color: green;
+  color: greenyellow;
+  padding: 0.25rem 1.75rem;
+  border-radius: 5px;
+  text-decoration: none;
+  font-weight: none;
+}
+
+:global(.test) {
+  background-color: red;
+}
+```
+
+![global style for active class](../img/section17-lecture209-007.png)
+
+---
+
+### 🐞 209.3 Issues:
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| AppNav on Homepage (demo only) | ℹ️ Informational | `src/pages/Homepage.jsx:9`: AppNav is for `/app` layout; consider removing from Homepage for production |
+| font-weight: none invalid | ⚠️ Identified | `src/components/PageNav.module.css:14`: Use `font-weight: normal` instead of `font-weight: none` |
+| :global(.test) demonstration code | ℹ️ Informational | `src/components/PageNav.module.css`: Remove `:global(.test)` and Homepage `className="test"` when cleaning up |
+| PageNav .list vs .nav ul | ℹ️ Low Priority | `src/components/PageNav.module.css`, `PageNav.jsx`: Ensure `.list` exists if used, or use `.nav ul` and remove `className` from ul |
+
+---
+
+### 🧱 209.4 Pending Fixes (TODO)
+
+- [ ] Fix `font-weight: none` to `font-weight: normal` in `src/components/PageNav.module.css` (line 14)
+- [ ] Remove `:global(.test)` from `src/components/PageNav.module.css` and `className="test"` from `src/pages/Homepage.jsx` when cleaning up demonstration code
+- [ ] Consider removing `AppNav` from Homepage and keeping it only in `AppLayout` for production — update `src/pages/Homepage.jsx` accordingly
+- [ ] Reconcile PageNav `ul` styling: if using `styles.list`, add `.list` to `PageNav.module.css`; if using `.nav ul`, remove `className={styles.list}` from the `ul` in `PageNav.jsx`
+
+[↑ top — 209. Lesson 209 — *Using CSS Modules*](#-209-lesson-209--using-css-modules)
+
+
 
 
 

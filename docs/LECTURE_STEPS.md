@@ -2454,6 +2454,285 @@ export default App;
 [↑ top — 210. Lesson 210 — *Building the Pages*](#-210-lesson-210--building-the-pages)
 
 
+<br>
+
+## 🔧 211. Lesson 211 — *Building the App Layout*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [211. Lesson 211 — *Building the App Layout*](#-211-lesson-211--building-the-app-layout)
+- [211.1 Context](#-2111-context)
+- [211.2 Updating code according the context](#-2112-updating-code-according-the-context)
+  - [211.2.1 Sidebar Component](#21121-sidebar-component)
+  - [211.2.2 Sidebar CSS Module](#21122-sidebar-css-module)
+  - [211.2.3 AppLayout with Sidebar](#21123-applayout-with-sidebar)
+  - [211.2.4 Map Component](#21124-map-component)
+  - [211.2.5 AppLayout with Sidebar and Map](#21125-applayout-with-sidebar-and-map)
+  - [211.2.6 List of Updated Component Files](#21126-list-of-updated-component-files)
+- [211.3 Issues](#-2113-issues)
+- [211.4 Pending Fixes (TODO)](#-2114-pending-fixes-todo)
+
+### 🧠 211.1 Context:
+
+**Building the App Layout** is the phase where the `/app` route transforms from a placeholder into a structured two-column layout: a **Sidebar** on the left (containing Logo, AppNav, city list placeholder, and footer) and a **Map** area on the right. This layout provides the main user interface for the Worldwise app—the map view for visited cities and the sidebar for navigation and city controls.
+
+The App Layout uses a flex-based structure defined in `AppLayout.module.css`: the container has `display: flex`, with the Sidebar taking a fixed `flex-basis` and the Map occupying the remaining space via `flex: 1`. This pattern is common in dashboards and map-based applications where a persistent sidebar holds controls while the main content area displays dynamic or interactive content.
+
+**Key Concepts:**
+
+1. **Layout composition** — `AppLayout` composes smaller components (`Sidebar`, `Map`) rather than rendering all UI inline. Each component has a single responsibility; the page orchestrates them.
+2. **Flex layout for app shell** — The parent uses `display: flex`; the Sidebar gets `flex-basis: 56rem` (fixed width); the Map gets `flex: 1` to fill remaining space. This ensures responsive behaviour without media queries at this stage.
+3. **Sidebar structure** — The Sidebar is a vertical column (`flex-direction: column`) containing Logo, AppNav, a placeholder for the city list, and a footer. The footer uses `margin-top: auto` to stick to the bottom, leveraging flexbox behaviour.
+4. **Map placeholder** — The Map component is initially a styled container; later lessons will integrate Leaflet or similar for the actual map. The CSS Module uses `:global()` for Leaflet-specific classes when the map library is added.
+5. **Separation of marketing vs app UI** — Marketing pages (Homepage, Product, Pricing, Login) use `PageNav`; the app section (`/app`) uses `AppNav` inside the Sidebar. This keeps navigation context-specific.
+6. **CSS Modules for layout** — `AppLayout`, `Sidebar`, and `Map` each use their own `.module.css` file for scoped styles, avoiding conflicts and keeping layout logic co-located.
+
+**Advantages:**
+- Clear visual hierarchy: sidebar for controls, map for content.
+- Reusable Sidebar; can be extended with city list, forms, and filters without touching Map.
+- Flex layout is simple to reason about and adjusts well for different viewport sizes (with future responsive tweaks).
+- Footer pinned to bottom via `margin-top: auto` without absolute positioning.
+- Prepared for Leaflet integration: `Map.module.css` already includes `:global()` overrides for Leaflet popup styling.
+
+**Disadvantages / Gotchas:**
+- Sidebar width (`56rem`) is fixed; on small screens it may consume too much space; responsive breakpoints will be needed later.
+- AppNav is still a placeholder with minimal content; needs NavLinks and styling to match the app context.
+- Import paths in Sidebar use `../components/Logo` despite being in `components/`; `./Logo` would be simpler and more consistent.
+- "List of cities" is a static `<p>` placeholder; the city list component will replace it in subsequent lessons.
+
+**When to Consider Alternatives:**
+- For collapsible or resizable sidebars — consider state for sidebar width or a layout library.
+- For very narrow viewports — use a drawer or bottom sheet instead of a persistent sidebar.
+- For complex nested layouts — consider CSS Grid or a layout component library (e.g. react-grid-layout).
+- If the map requires full viewport — the Sidebar could be overlayed or toggled rather than always visible.
+
+In Worldwise, this lesson completes the app shell: users navigating to `/app` see the Sidebar (Logo, AppNav, footer) and the Map area, ready for data integration and interactive map features in later lessons.
+
+---
+
+### ⚙️ 211.2 Updating code according the context:
+
+#### **Summary**
+
+- Section 211.2 demonstrates how to build the App Layout for the `/app` route by introducing the Sidebar and Map components and composing them in `AppLayout`.
+- It solves the problem of a placeholder app section by providing a real two-column layout: Sidebar (navigation, city list placeholder, footer) and Map (interactive content area).
+- Subsections 211.2.1–211.2.2 define the Sidebar component and its CSS Module; 211.2.3 integrates Sidebar into AppLayout; 211.2.4 defines the Map component; 211.2.5 composes both in AppLayout; 211.2.6 lists the full set of component files introduced or updated in this lesson.
+- The image `section17-lecture211-001.png` illustrates the final App Layout with Sidebar and Map.
+
+---
+
+#### 211.2.1 Sidebar Component
+
+**Subsection Summary:**
+- Creates the `Sidebar` component in `src/components/Sidebar.jsx`.
+- Renders a vertical layout containing Logo, AppNav, a "List of cities" placeholder paragraph, and a footer with dynamic copyright year.
+- Uses CSS Modules (`Sidebar.module.css`) for scoped styling.
+- Establishes the left-hand column of the app layout; Logo and AppNav provide brand and app-specific navigation; the footer uses `margin-top: auto` to stay at the bottom.
+
+```jsx
+/* src/components/Sidebar.jsx */
+import styles from './Sidebar.module.css'
+import Logo from './Logo'
+import AppNav from './AppNav'
+
+const Sidebar = () => {
+  return (
+    <div className={styles.sidebar}>
+      <Logo />
+      <AppNav />
+
+      <p>List of cities</p>
+      <footer className={styles.footer}>
+        <p className={styles.copyright}>
+          &copy; Copyright {new Date().getFullYear()} by WorldWise Inc.
+        </p>
+      </footer>
+    </div>
+  )
+}
+
+export default Sidebar
+```
+
+---
+
+#### 211.2.2 Sidebar CSS Module
+
+**Subsection Summary:**
+- Creates `src/components/Sidebar.module.css` with `.sidebar`, `.footer`, and `.copyright` classes.
+- `.sidebar` sets fixed width (`flex-basis: 56rem`), dark background, padding, flex column layout, and full height minus top padding.
+- `.footer` uses `margin-top: auto` to push the copyright to the bottom of the flex container.
+- `.copyright` styles the footer text with smaller font size and muted colour.
+- Ensures the Sidebar has a distinct visual identity and correct flex behaviour within the App Layout.
+
+```css
+/* src/components/Sidebar.module.css */
+.sidebar {
+  flex-basis: 56rem;
+  background-color: var(--color-dark--1);
+  padding: 3rem 5rem 3.5rem 5rem;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: calc(100vh - 4.8rem);
+}
+
+.footer {
+  margin-top: auto;
+}
+
+.copyright {
+  font-size: 1.2rem;
+  color: var(--color-light--1);
+}
+```
+
+---
+
+#### 211.2.3 AppLayout with Sidebar
+
+**Subsection Summary:**
+- Replaces the previous AppNav-only layout in `AppLayout` with the new `Sidebar` component.
+- Removes or comments out direct `AppNav` and placeholder text; imports and renders `Sidebar` inside the `.app` container.
+- The `.app` class in `AppLayout.module.css` provides `display: flex`, so Sidebar appears as the first flex child.
+- Prepares for the Map component to be added as the second flex child in the next step.
+
+```jsx
+/* src/pages/AppLayout.jsx */
+// import AppNav from "../components/AppNav";
+import Sidebar from "../components/Sidebar";
+import styles from './AppLayout.module.css';
+const AppLayout = () => {
+  return (
+    <div className={styles.app}>
+      {/* <AppNav />
+      <p>App Layout</p> */}
+      <Sidebar />
+    </div>
+  );
+};
+
+export default AppLayout;
+```
+
+---
+
+#### 211.2.4 Map Component
+
+**Subsection Summary:**
+- Creates the `Map` component in `src/components/Map.jsx` as a placeholder for the future map view.
+- Renders a `div` with `mapContainer` class; displays "Map" text for now.
+- Uses `Map.module.css` for layout: `flex: 1`, full height, dark background, `position: relative` for future overlay elements.
+- Prepares the structure for Leaflet integration; `Map.module.css` already includes `:global()` overrides for Leaflet popup styling (background, typography, brand colour accents).
+
+```jsx
+/* src/components/Map.jsx */
+import styles from './Map.module.css';
+const Map = () => {
+  return (
+    <div className={styles.mapContainer}>
+      Map
+    </div>
+  )
+}
+
+export default Map;
+```
+
+---
+
+#### 211.2.5 AppLayout with Sidebar and Map
+
+**Subsection Summary:**
+- Adds the `Map` component to `AppLayout` alongside the `Sidebar`.
+- Both components render inside the flex container; Sidebar has `flex-basis: 56rem`, Map has `flex: 1` from its CSS Module.
+- Produces the final two-column layout: sidebar on the left, map area on the right.
+- The image `section17-lecture211-001.png` illustrates the complete Worldwise app layout with Sidebar and Map visible.
+
+```jsx
+/* src/pages/AppLayout.jsx */
+import Sidebar from "../components/Sidebar";
+import Logo from './Logo'
+import AppNav from './AppNav'
+const AppLayout = () => {
+  return (
+    <div className={styles.app}>
+      <Sidebar />
+      <Map />
+    </div>
+  );
+};
+
+export default AppLayout;
+```
+
+![worldwise app](../img/section17-lecture211-001.png)
+
+---
+
+#### 211.2.6 List of Updated Component Files
+
+**Subsection Summary:**
+- Lists all component files introduced or updated as part of Lesson 211 and the broader app build.
+- Includes layout components (Sidebar, Map), UI components (Button, Form, User, City, CityItem, CountryItem), feedback components (Message, Spinner, SpinnerFullPage), and their associated CSS Modules.
+- Serves as a reference for the full component inventory; some components (e.g. City, Form, User) may be used in later lessons for city list and user features.
+- **Note:** Corrected typo `Buttom.module.ccs` → `Button.module.css` and `City.modules.css` → `City.module.css`; `User.module.csss` → `User.module.css`.
+
+Other updated components files:
+
+```
+- components/Button.module.css
+- components/City.jsx
+- components/City.module.css
+- components/CityItem.jsx
+- components/CityItem.module.css
+- components/CityList.module.css
+- components/CountryItem.jsx
+- components/CountryItem.module.css
+- components/CountryList.module.css
+- components/Form.jsx
+- components/Form.module.css
+- components/Map.jsx
+- components/Map.module.css
+- components/Message.jsx
+- components/Message.module.css
+- components/Sidebar.jsx
+- components/Sidebar.module.css
+- components/Spinner.jsx
+- components/Spinner.module.css
+- components/SpinnerFullPage.jsx
+- components/SpinnerFullPage.module.css
+- components/User.jsx
+- components/User.module.css
+```
+
+---
+
+### 🐞 211.3 Issues:
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| Redundant import paths in Sidebar | ℹ️ Low Priority | `src/components/Sidebar.jsx:2-3`: Use `./Logo` and `./AppNav` instead of `../components/Logo` and `../components/AppNav` |
+| AppNav is placeholder only | ⚠️ Identified | `src/components/AppNav.jsx`: Renders "App Navigation" and empty `<ul>`; needs NavLinks for Cities, Countries, Account |
+| City list not integrated | ⚠️ Identified | `src/components/Sidebar.jsx:11`: Static `<p>List of cities</p>`; CityList/CityItem components exist but not used |
+| Logo links to / vs /app | ℹ️ Informational | `src/components/Logo.jsx`: Links to `/`; consider whether app users should navigate to `/app` from within the app |
+| Leaflet styles without map | ℹ️ Informational | `src/components/Map.module.css`: `:global()` Leaflet overrides have no effect until Leaflet is integrated |
+
+---
+
+### 🧱 211.4 Pending Fixes (TODO)
+
+- [ ] Simplify Sidebar imports: change `../components/Logo` to `./Logo` and `../components/AppNav` to `./AppNav` in `src/components/Sidebar.jsx` (lines 2-3)
+- [ ] Implement AppNav with NavLinks for app routes (e.g. Cities, Countries, Account) and apply appropriate styling in `src/components/AppNav.jsx`
+- [ ] Replace static "List of cities" placeholder with `CityList` (and `CityItem`) in `src/components/Sidebar.jsx` (line 11) once data fetching is set up
+- [ ] Integrate Leaflet map in `src/components/Map.jsx` so `Map.module.css` Leaflet `:global()` styles take effect
+- [ ] Consider responsive breakpoints for Sidebar width (`56rem`) in `src/components/Sidebar.module.css` for smaller viewports
+
+[↑ top — 211. Lesson 211 — *Building the App Layout*](#-211-lesson-211--building-the-app-layout)
+
+
 
 
 

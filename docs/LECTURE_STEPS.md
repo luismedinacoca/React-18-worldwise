@@ -2714,7 +2714,6 @@ Other updated components files:
 
 | Issue | Status | Log/Error |
 |---|---|---|
-| Redundant import paths in Sidebar | ℹ️ Low Priority | `src/components/Sidebar.jsx:2-3`: Use `./Logo` and `./AppNav` instead of `../components/Logo` and `../components/AppNav` |
 | AppNav is placeholder only | ⚠️ Identified | `src/components/AppNav.jsx`: Renders "App Navigation" and empty `<ul>`; needs NavLinks for Cities, Countries, Account |
 | City list not integrated | ⚠️ Identified | `src/components/Sidebar.jsx:11`: Static `<p>List of cities</p>`; CityList/CityItem components exist but not used |
 | Logo links to / vs /app | ℹ️ Informational | `src/components/Logo.jsx`: Links to `/`; consider whether app users should navigate to `/app` from within the app |

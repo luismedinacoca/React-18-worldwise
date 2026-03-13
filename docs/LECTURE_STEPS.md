@@ -2668,6 +2668,9 @@ const AppLayout = () => {
 export default AppLayout;
 ```
 
+* Visit [App Layout page](http://localhost:5173/app)
+
+
 ![worldwise app](../img/section17-lecture211-001.png)
 
 ---
@@ -2730,6 +2733,258 @@ Other updated components files:
 - [ ] Consider responsive breakpoints for Sidebar width (`56rem`) in `src/components/Sidebar.module.css` for smaller viewports
 
 [↑ top — 211. Lesson 211 — *Building the App Layout*](#-211-lesson-211--building-the-app-layout)
+
+
+
+<br>
+
+## 🔧 212. Lesson 212 — *Nested Routes and Index Route*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [212. Lesson 212 — *Nested Routes and Index Route*](#-212-lesson-212--nested-routes-and-index-route)
+- [212.1 Context](#-2121-context)
+- [212.2 Updating code/theory according the context](#-2122-updating-codetheory-according-the-context)
+  - [212.2.1 Defining Nested Routes in App.jsx](#21221-defining-nested-routes-in-appjsx)
+  - [212.2.2 Using Outlet in Sidebar](#21222-using-outlet-in-sidebar)
+  - [212.2.3 Adding Index Route](#21223-adding-index-route)
+  - [212.2.4 NavLinks in AppNav](#21224-navlinks-in-appnav)
+  - [212.2.5 Cities and Countries Links](#21225-cities-and-countries-links)
+  - [212.2.6 NavLink Active Class and React Router Benefits](#21226-navlink-active-class-and-react-router-benefits)
+- [212.3 Issues](#-2123-issues)
+- [212.4 Pending Fixes (TODO)](#-2124-pending-fixes-todo)
+
+### 🧠 212.1 Context:
+
+**Nested routes** let you define hierarchical URL structures where child routes render inside a parent layout. Instead of repeating the same layout (sidebar, header, etc.) for each page, the parent route provides a shared layout and child routes render into an **`<Outlet />`** — a placeholder where React Router injects the matched child component.
+
+An **index route** is a special child route that renders when the parent path is matched exactly (e.g. `/app` with no suffix). It uses `<Route index element={...} />` instead of `path="..."`, and serves as the default view for that segment.
+
+**Key Concepts:**
+
+1. **`<Outlet />`** — A component from React Router that renders the matched child route. The parent layout wraps the Outlet, so the sidebar/header stay visible while only the content area changes.
+2. **Index route** — Renders when the parent URL is matched exactly. Example: `/app` shows the index element; `/app/cities` shows the `cities` child.
+3. **Relative paths** — Nested routes use relative paths (e.g. `path="cities"`), which resolve to `/app/cities` when the parent is `/app`.
+4. **`<NavLink>`** — Like `<Link>`, but adds `active` / `activeClassName` when the current URL matches, useful for highlighting the active nav item.
+
+**Advantages:**
+- DRY layouts: sidebar, header, and shared UI live in one parent component.
+- URLs reflect structure: `/app/cities`, `/app/countries` map cleanly to nested route definitions.
+- Index route provides a sensible default when visiting `/app` without a child path.
+- Easy to add more child routes without duplicating layout code.
+
+**Disadvantages / Gotchas:**
+- Must render `<Outlet />` in the parent; otherwise child routes will not appear.
+- Index route and a child with `path=""` are mutually exclusive; use `index` for the default view.
+- Relative `to` in NavLinks must be used within the nested route context; absolute paths (`/app/cities`) work everywhere.
+
+**When to Consider Alternatives:**
+- For very flat route structures (few routes, no shared layout) — simple top-level routes may suffice.
+- For deeply nested navigation — consider layout composition or route configuration abstractions to keep things maintainable.
+
+In **Worldwise**, the `/app` route uses `AppLayout` as the parent. `Sidebar` renders `<Outlet />` so child routes (cities, countries, form) display in the sidebar content area. The index route shows the default list view when users visit `/app`.
+
+---
+
+### ⚙️ 212.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section 212.2 explains how to implement **nested routes** and an **index route** in the Worldwise app using React Router.
+- It shows defining child routes under `/app`, rendering them via `<Outlet />` in `Sidebar`, and using `<NavLink>` for navigation with active states.
+- Subsections 212.2.1–212.2.2 cover route definition and the Outlet; 212.2.3 introduces the index route; 212.2.4–212.2.6 cover AppNav NavLinks, links behavior, and React Router benefits.
+
+---
+
+#### 212.2.1 Defining Nested Routes in App.jsx
+
+**Subsection Summary:**
+- Demonstrates how to define **nested routes** by placing child `<Route>` elements inside a parent `<Route>` that has an `element` (e.g. `<AppLayout />`).
+- Child routes `cities`, `countries`, and `form` are defined with relative paths; they resolve to `/app/cities`, `/app/countries`, `/app/form` when the parent path is `/app`.
+- Establishes the route hierarchy that React Router uses to match URLs and render the corresponding components.
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/product" element={<Product />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/app" element={<AppLayout />}>
+          <Route path="cities" element={<p>List of Cities</p>}/>        {/* 👈🏽 ✅ */}
+          <Route path="countries" element={<p>Countries</p>}/>          {/* 👈🏽 ✅ */}
+          <Route path="form" element={<p>Form</p>}/>                    {/* 👈🏽 ✅ */}
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+#### 212.2.2 Using Outlet in Sidebar
+
+**Subsection Summary:**
+- Introduces **`<Outlet />`** from `react-router-dom` as the placeholder where React Router renders the matched child route component.
+- The Outlet is placed inside `Sidebar` because the Sidebar is the component that provides the layout (Logo, AppNav, footer) around the dynamic content area; the child route content (cities list, countries list, form) should appear between AppNav and the footer.
+- The image `section17-lecture212-001.png` illustrates the nested route structure: parent layout with Outlet, and how child content is injected into that slot.
+
+```jsx
+/* src/components/Sidebar.jsx */
+import { Outlet } from 'react-router-dom';          // 👈🏽 ✅
+import Logo from './Logo'
+import AppNav from './AppNav'
+import styles from './Sidebar.module.css'
+
+const Sidebar = () => {
+  return (
+    <div className={styles.sidebar}>
+      <Logo />
+      <AppNav />
+
+      <Outlet />                                    {/* 👈🏽 ✅ */}
+
+      <footer className={styles.footer}>
+        <p className={styles.copyright}>
+          &copy; Copyright {new Date().getFullYear()} by WorldWise Inc.
+        </p>
+      </footer>
+    </div>
+  )
+}
+
+export default Sidebar;
+```
+
+![nested routes](../img/section17-lecture212-001.png)
+
+#### 212.2.3 Adding Index Route
+
+**Subsection Summary:**
+- Adds an **index route** using `<Route index element={...} />` so that visiting `/app` (without a child path) renders a default view (e.g. `<p>LIST</p>`).
+- The index route has no `path`; it matches when the parent path is matched exactly.
+- The image `section17-lecture212-002.png` shows the index page content rendered inside the App component layout.
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/product" element={<Product />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<p>LIST</p>}/>                    {/* 👈🏽 ✅ */}
+          <Route path="cities" element={<p>Cities</p>}/>
+          <Route path="countries" element={<p>Countries</p>}/>
+          <Route path="form" element={<p>Form</p>}/>
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+![index page in App component](../img/section17-lecture212-002.png)
+
+#### 212.2.4 NavLinks in AppNav
+
+**Subsection Summary:**
+- Replaces plain links with **`<NavLink>`** from React Router for Cities and Countries navigation.
+- Uses relative `to` values (`cities`, `countries`) so links resolve to `/app/cities` and `/app/countries` when rendered within the `/app` route context.
+- NavLink provides built-in active state styling when the current URL matches the link.
+
+```jsx
+/* src/components/AppNav.jsx */
+import { nav } from "./AppNav.module.css";
+import { NavLink } from "react-router-dom";                     // 👈🏽 ✅
+
+const AppNav = () => {
+  return (
+    <nav className={nav}>
+      <ul>
+        <li>
+          <NavLink to='cities'>Cities</NavLink>                 {/* 👈🏽 ✅ */}
+        </li>
+        <li>
+          <NavLink to='countries'>Countries</NavLink>           {/* 👈🏽 ✅ */}
+        </li>
+      </ul>
+    </nav>
+  );
+};
+
+export default AppNav;
+```
+
+#### 212.2.5 Cities and Countries Links
+
+**Subsection Summary:**
+- Confirms that Cities and Countries NavLinks navigate correctly to `/app/cities` and `/app/countries`.
+- The image `section17-lecture212-003.png` shows the Cities and Countries links in the sidebar nav.
+- Visiting the App page at `http://localhost:5173/app` displays the index route content; clicking Cities or Countries updates the URL and the content area via the Outlet.
+
+[App page](http://localhost:5173/app)
+![cities and countries links](../img/section17-lecture212-003.png)
+
+
+#### 212.2.6 NavLink Active Class and React Router Benefits
+
+**Subsection Summary:**
+- Explains why React Router is used: declarative routing, nested layouts, URL-driven navigation, and built-in components (`Link`, `NavLink`, `Outlet`) that integrate with the React tree.
+- **Benefits of React Router:** client-side navigation without full reloads, shareable/bookmarkable URLs, browser back/forward support, nested routes with shared layouts, active link styling via NavLink, and programmatic navigation via `useNavigate`.
+- The image `section17-lecture212-004.png` illustrates the active class applied to the current nav item when viewing Cities or Countries.
+
+[App page, City page and Countries page](http://localhost:5173/app/cities)
+![active class](../img/section17-lecture212-004.png)
+
+### 🐞 212.3 Issues:
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| Form route not linked in AppNav | ⚠️ Identified | `src/components/AppNav.jsx`: Only Cities and Countries NavLinks; no link to `/app/form` |
+| Index route shows placeholder | ⚠️ Identified | `src/App.jsx:18`: `<Route index element={<p>LIST</p>}/>`; replace with CityList when data is ready |
+| NavLink active styling | ✅ Already in place | `src/components/AppNav.module.css:26-28`: `:global(.active)` styles active nav links |
+| Form route placeholder content | ⚠️ Identified | `src/App.jsx:21`: `<Route path="form" element={<p>Form</p>}/>`; integrate Form component |
+
+---
+
+### 🧱 212.4 Pending Fixes (TODO)
+
+- [ ] Add NavLink for Form in `src/components/AppNav.jsx` (e.g. `<NavLink to='form'>Add City</NavLink>` or similar)
+- [ ] Replace index route placeholder `<p>LIST</p>` in `src/App.jsx:18` with `CityList` once data fetching is implemented
+- [ ] Wire `Form` component into the form route in `src/App.jsx:21` (replace `<p>Form</p>` with `<Form />`)
+- [ ] *(Optional)* Customize NavLink active state styling in `src/components/AppNav.module.css` if desired (`:global(.active)` already exists)
+- [ ] Consider adding `end` prop to the Cities NavLink if it should not show active when on `/app/cities/:id` (e.g. city detail view)
+
+[↑ top — 212. Lesson 212 — *Nested Routes and Index Route*](#-212-lesson-212--nested-routes-and-index-route)
 
 
 

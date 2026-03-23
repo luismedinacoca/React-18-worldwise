@@ -2988,6 +2988,464 @@ export default AppNav;
 
 
 
+<br>
+
+## 🔧 213. Lesson 213 — *Implementing the Cities List*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [213. Lesson 213 — *Implementing the Cities List*](#-213-lesson-213--implementing-the-cities-list)
+- [213.1 Context](#-2131-context)
+- [213.2 Updating code/theory according the context](#-2132-updating-codetheory-according-the-context)
+  - [213.2.1 Initial CityList Placeholder](#21321-initial-citylist-placeholder)
+  - [213.2.2 Wiring CityList in Nested Routes](#21322-wiring-citylist-in-nested-routes)
+  - [213.2.3 Installing json-server](#21323-installing-json-server)
+  - [213.2.4 Installing concurrently](#21324-installing-concurrently)
+  - [213.2.5 Dev Scripts: Vite + json-server](#21325-dev-scripts-vite--json-server)
+  - [213.2.6 Running the Stack and Verifying the API](#21326-running-the-stack-and-verifying-the-api)
+  - [213.2.7 CityList: Loading State and List Rendering](#21327-citylist-loading-state-and-list-rendering)
+  - [213.2.8 App: Fetching Cities and Passing Props](#21328-app-fetching-cities-and-passing-props)
+  - [213.2.9 CityItem Placeholder](#21329-cityitem-placeholder)
+  - [213.2.10 CityItem: Styling and Formatted Date](#213210-cityitem-styling-and-formatted-date)
+  - [213.2.11 Seeding `data/cities.json`](#213211-seeding-datacitiesjson)
+  - [213.2.12 CityList: Empty State with Message](#213212-citylist-empty-state-with-message)
+- [213.3 Issues](#-2133-issues)
+- [213.4 Pending Fixes (TODO)](#-2134-pending-fixes-todo)
+
+### 🧠 213.1 Context:
+
+**Implementing the Cities List** connects the nested `/app` routes to real data: a **REST-shaped mock API** (via **json-server**) serves city records from `data/cities.json`, while **React state** in `App` holds the fetched list and loading flag. **`CityList`** becomes a **container-style presentational component** that shows a **spinner** while loading, a **friendly message** when there are no cities, and a **mapped list** of **`CityItem`** rows when data exists.
+
+This pattern mirrors how many SPAs work: **lift state up** to a common ancestor (`App`) so every nested route that renders `CityList` receives the same `cities` and `isLoading` props; **child components** stay focused on display (`CityItem`) and list orchestration (`CityList`).
+
+**Key Concepts:**
+
+1. **Mock API with json-server** — A JSON file becomes HTTP endpoints (e.g. `GET /cities`), so the UI can be developed before a real backend exists.
+2. **`useEffect` + `fetch`** — Load data once on mount (empty dependency array), set loading before/after the request, and store the JSON response in state.
+3. **Props drilling (here, intentionally)** — `App` passes `cities` and `isLoading` into `CityList`; alternatives like Context or a data library come later when more routes need the same data.
+4. **Conditional UI** — Spinner → empty message → list, driven by `isLoading` and `cities.length`.
+5. **`Intl.DateTimeFormat`** — Locale-aware formatting for each city’s `date` without manual string templates.
+6. **Index + sibling routes** — `index` and `path="cities"` can both render the same component so `/app` and `/app/cities` show the same list (no redirect required unless you add one).
+
+**Advantages:**
+- Fast local development with a real HTTP round-trip and JSON payloads.
+- Clear separation: `App` owns data fetching; `CityList` / `CityItem` focus on UI.
+- Empty and loading states improve UX compared to a blank list.
+- `concurrently` runs API and Vite with one `npm run dev` command.
+
+**Disadvantages / Gotchas:**
+- **CORS / URL**: The app must request the same host/port you configure (e.g. `http://localhost:8000`); production needs a real API or proxy.
+- **Lecture snippets vs. correct React patterns**: Examples may show `useState({})` for a list or a non-destructured `CityList` signature—those break `.map` / `.length`; the corrected versions use an **array** and **`({ cities, isLoading })`** (see Issues).
+- **Delete button** is visual-only until a delete handler and API call exist.
+- **json-server** schema must match what the UI expects (`cities` as an array at `GET /cities` with the default resource layout).
+
+**When to Consider Alternatives:**
+- **React Query / SWR / RTK Query** — When you need caching, refetching, and error boundaries at scale.
+- **Route loaders (React Router data APIs)** — When data should load per-route instead of only in `App`.
+- **Context or global store** — When many deep components need cities without passing props through every level.
+
+In **Worldwise**, this lesson wires **`CityList`** and **`CityItem`**, **`Spinner`**, **`Message`**, **`fetch`** in **`src/App.jsx`**, and **`json-server`** + **`concurrently`** in **`package.json`**, backed by **`data/cities.json`**.
+
+---
+
+### ⚙️ 213.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section **213.2** walks from a **static `CityList` placeholder** to a **data-driven list** powered by **json-server**, **concurrent dev scripts**, and **`fetch`** in **`App`**.
+- It explains why **index** and **`path="cities"`** can both render **`CityList`** (same UI, two URLs) and how **React Router v6** treats **index routes** (no `path` on the same `Route` as `index`).
+- Subsections **213.2.1–213.2.2** set up the component and routes; **213.2.3–213.2.6** add the mock API and tooling; **213.2.7–213.2.8** connect loading, list mapping, and app-level state; **213.2.9–213.2.10** build **`CityItem`**; **213.2.11–213.2.12** handle **empty seed data** and the **empty-state message**.
+- Images **`section17-lecture213-001.png`** (routes / app shell), **`section17-lecture213-002.png`** (API / JSON), and **`section17-lecture213-003.png`** (empty list message) illustrate the **router wiring**, **API verification**, and **UX** for an empty collection.
+
+---
+
+#### 213.2.1 Initial CityList Placeholder
+
+**Subsection Summary:**
+- Introduces a minimal **`CityList`** with a **`ul`** and CSS module class `cityList`.
+- Serves as a **visual shell** before data and child items exist.
+- Establishes the file **`src/components/CityList.jsx`** and **default export** pattern used by routes.
+
+```jsx
+/* src/components/CityList.jsx */
+import styles from './CityList.module.css'
+
+const CityList = () => {
+  return (
+    <ul className={styles.cityList}>
+      City List
+    </ul>
+  )
+}
+
+export default CityList
+```
+
+---
+
+#### 213.2.2 Wiring CityList in Nested Routes
+
+**Subsection Summary:**
+- Imports **`CityList`** into **`App.jsx`** and mounts it on **`/app`** as both the **index** route and **`cities`** child route.
+- **`section17-lecture213-001.png`** illustrates the **sidebar + outlet** layout with **Cities** content active.
+- Clarifies **React Router v6** rules: an **`index`** route cannot also set a **`path`** on the same **`Route`**; repeating **`CityList`** for **`index`** and **`path="cities"`** is intentional so **`/app`** and **`/app/cities`** share the same screen (unless you later add a **redirect** or a different default).
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+import CityList from "./components/CityList";                           // 👈🏽 ✅
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/product" element={<Product />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<CityList />}/>                         {/* 👈🏽 ✅ */}
+          <Route path="cities" element={<CityList />}/>                 {/* 👈🏽 ✅ */}
+          <Route path="countries" element={<p>Countries</p>}/>
+          <Route path="form" element={<p>Form</p>}/>
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+![](../img/section17-lecture213-001.png)
+
+* In **React Router v6**, you cannot combine **`index`** and **`path`** on the same **`Route`**. The **`index`** attribute marks the **default** child when the parent path matches exactly (e.g. **`/app`**). Index routes have **no `path`** because they are implicitly the parent’s default segment.
+
+* Duplicating **`CityList`** on **`index`** and **`path="cities"`** is an explicit way to say **two URLs** should show the **same content** (contrast with redirecting **`/app`** → **`/app/cities`**, which is a different product choice).
+
+* In short: **index** and **path** are separate route shapes by design in **React Router v6**.
+
+---
+
+#### 213.2.3 Installing json-server
+
+**Subsection Summary:**
+- Adds **json-server** as a dependency so **`data/cities.json`** can be exposed as HTTP routes during development.
+
+```bash
+npm i json-server
+```
+
+---
+
+#### 213.2.4 Installing concurrently
+
+**Subsection Summary:**
+- Adds **concurrently** as a dev dependency to run **Vite** and **json-server** in parallel from one npm script.
+
+```bash
+npm install --save-dev concurrently
+```
+
+---
+
+#### 213.2.5 Dev Scripts: Vite + json-server
+
+**Subsection Summary:**
+- **`dev`** runs **`concurrently`**: **`npm run server`** (json-server on port **8000**) and **`npm run vite`** (frontend).
+- **`server`** watches **`data/cities.json`** so edits reload the mock API.
+
+```jsx
+/* package.json */
+{
+  "name": "18-worldwise",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run vite\"",          // 👈🏽 ✅
+    "vite": "vite",                                                     // 👈🏽 ✅
+    "server": "json-server --watch data/cities.json --port 8000",       // 👈🏽 ✅
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "json-server": "^1.0.0-beta.13",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "vite": "^7.3.1"
+  }
+}
+```
+
+---
+
+#### 213.2.6 Running the Stack and Verifying the API
+
+**Subsection Summary:**
+- Run **`npm run dev`**, then open **`http://localhost:8000/cities`** to confirm the mock API returns JSON.
+- **`section17-lecture213-002.png`** shows the **browser / network** view of the **`cities`** endpoint or the **`data/cities.json`** shape.
+
+```bash
+npm run dev
+```
+[http://localhost:8000/cities](http://localhost:8000/cities)
+![data/cities.json file](../img/section17-lecture213-002.png)
+
+
+---
+
+#### 213.2.7 CityList: Loading State and List Rendering
+
+**Subsection Summary:**
+- Adds **`Spinner`** for **`isLoading`**, maps **`cities`** to **`CityItem`**, and uses **`key={city.id}`** for list reconciliation.
+- The snippet below illustrates the **intended** API; **props must be destructured** from the first argument—see **213.3 Issues** if the lecture shows a non-destructured signature.
+
+```jsx
+/* src/components/CityList.jsx */
+import Spinner from './Spinner';
+import styles from './CityList.module.css'
+
+const CityList = (cities, isLoading) => {
+  if(isLoading) return <Spinner />;
+
+  return (
+    <ul className={styles.cityList}>
+      {cities.map(city => (
+        <CityItem city={city} key={city.id} />
+      ))}
+    </ul>
+  )
+}
+
+export default CityList
+```
+
+---
+
+#### 213.2.8 App: Fetching Cities and Passing Props
+
+**Subsection Summary:**
+- Defines **`BASE_URL`**, **`useState`** for **`cities`** and **`isLoading`**, and **`useEffect`** to **`fetch`** `GET /cities` once on mount.
+- Passes **`cities`** and **`isLoading`** into **`CityList`** for both **index** and **`cities`** routes.
+- **Note:** **`cities`** should be initialized as an **array** (e.g. **`useState([])`**), not an object, so **`.map`** / **`.length`** work—see **213.3** if the lecture snippet used **`useState({})`**.
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+import CityList from "./components/CityList";
+
+const BASE_URL = "http://localhost:8000"                                                        // 👈🏽 ✅
+
+function App() {
+  const [cities, setCities] = useState({});                                                     // 👈🏽 ✅
+  const [isLoading, setIsLoading] = useState(false);                                            // 👈🏽 ✅
+
+  useEffect(() => {                                                                             // 👈🏽 ✅
+    async function fetchCities() {
+      try{
+        setIsLoading(true);
+        const res = await fetch(`${BASE_URL}/cities`);
+        const data = await res.json();
+        setCities(data);
+      } catch(error) {
+        console.error(error);
+        alert("There was an error loading data");
+      }
+      finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCities();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/product" element={<Product />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<CityList cities={cities} isLoading={isLoading} />}/>           {/* 👈🏽 ✅ */}
+          <Route path="cities" element={<CityList cities={cities} isLoading={isLoading} />}/>   {/* 👈🏽 ✅ */}
+          <Route path="countries" element={<p>Countries</p>}/>
+          <Route path="form" element={<p>Form</p>}/>
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+---
+
+#### 213.2.9 CityItem Placeholder
+
+**Subsection Summary:**
+- **`CityItem`** starts as a stub returning static **“city”** text inside a **`div`**, validating imports and route composition before styling and fields.
+
+```jsx
+/* src/components/CityItem.jsx */
+const CityItem = ( {city} ) => {
+  return (
+    <div>
+      city
+    </div>
+  )
+}
+
+export default CityItem
+```
+
+---
+
+#### 213.2.10 CityItem: Styling and Formatted Date
+
+**Subsection Summary:**
+- Moves markup to **`<li>`** for semantic lists, applies **`CityItem.module.css`**, and renders **`emoji`**, **`cityName`**, and **`date`**.
+- **`formatDate`** uses **`Intl.DateTimeFormat`** with **`"en"`** for readable month/day/year.
+- **`deleteBtn`** is present for layout; behavior comes in a later lesson.
+
+```jsx
+/* src/components/CityItem.jsx */
+import styles from './CityItem.module.css';
+
+const formatDate = (date) => 
+  new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
+
+const CityItem = ( {city} ) => {
+  const { emoji, cityName, date } = city;
+  //console.log(city);
+
+  return (
+    <li className={styles.cityItem}>
+      <span className={styles.emoji}>{emoji}</span>
+      <h3 className={styles.name}>{cityName}</h3>
+      <time className={styles.date}>{formatDate(date)}</time>
+      <button className={styles.deleteBtn}>&times;</button>
+    </li>
+  )
+}
+
+export default CityItem
+```
+
+---
+
+#### 213.2.11 Seeding `data/cities.json`
+
+**Subsection Summary:**
+- Copy or create **`data/cities.json`** with a top-level **`cities`** array (empty at first) so the UI can show the **empty state** and **`json-server`** serves **`GET /cities`** consistently.
+
+* Copy/paste the starter **`data/cities.json`** from the course materials first, or create:
+
+```json
+/* data/cities.json */
+{
+  "cities": []
+}
+```
+
+---
+
+#### 213.2.12 CityList: Empty State with Message
+
+**Subsection Summary:**
+- Imports **`Message`** and returns it when **`!cities.length`** so users see guidance instead of a blank panel.
+- **`section17-lecture213-003.png`** shows the **empty list** message in the **Cities** sidebar area.
+
+```jsx
+/* src/components/CityList.jsx */
+import Spinner from './Spinner';
+import CityItem from './CityItem';
+import Message from './Message';                          // 👈🏽 ✅
+import styles from './CityList.module.css';
+
+
+const CityList = ({ cities, isLoading }) => {
+  if(isLoading) return <Spinner />;
+
+  if(!cities.length) return <Message message='Add your first city by clicking on a city on the map' />    {/* 👈🏽 ✅ */}
+
+  return (
+    <ul className={styles.cityList}>
+      {cities.map(city => (
+        <CityItem city={city} key={city.id} />
+      ))}
+    </ul>
+  )
+}
+
+export default CityList
+```
+
+![](../img/section17-lecture213-003.png)
+
+---
+
+### 🐞 213.3 Issues:
+
+- **Incorrect `CityList` parameter list in 213.2.7**: React passes **one props object**; **`(cities, isLoading)`** is wrong—use **`({ cities, isLoading })`** (as in **213.2.12** / project source).
+- **`useState({})` for `cities` in 213.2.8**: An **object** has no **`.map`** / **`.length`** like an array; use **`useState([])`** (see **`src/App.jsx`**).
+- **Duplicate subsection label**: Two blocks were labeled **213.2.11**; the empty-state **`CityList`** step is **213.2.12** in this doc.
+- **Delete control**: **`CityItem`** delete button has **no `onClick`** / API delete yet—expected until a later lesson.
+- **Error handling**: **`alert`** in **`fetch`** catch is acceptable for the course; production apps often use **inline error UI** or **toasts**.
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| `CityList` props not destructured in 213.2.7 snippet | ⚠️ Identified | `docs/LECTURE_STEPS.md` (213.2.7): `const CityList = (cities, isLoading)` breaks props; correct: `const CityList = ({ cities, isLoading })` — compare `src/components/CityList.jsx:7-8` |
+| `cities` initialized as `{}` in 213.2.8 snippet | ⚠️ Identified | `docs/LECTURE_STEPS.md` (213.2.8): `useState({})` vs list operations; `src/App.jsx:14` uses `useState([])` |
+| Duplicate `213.2.11` headings | ✅ Fixed | `docs/LECTURE_STEPS.md`: second block renamed to **213.2.12** |
+| Delete button without handler | ℹ️ Informational | `src/components/CityItem.jsx:19`: `<button className={styles.deleteBtn}>` — no delete logic yet |
+
+---
+
+### 🧱 213.4 Pending Fixes (TODO)
+
+- [ ] Implement **delete city**: wire **`onClick`** on **`src/components/CityItem.jsx`** (delete button) to **`DELETE`** (or **`PATCH`**) on **`json-server`** and update **`cities`** in **`App`** (lift handler or Context).
+- [ ] Replace **`alert`** in **`src/App.jsx:26`** with a non-blocking **error message** component or **toast** when **`fetch`** fails.
+- [ ] Add **`aria-label`** (e.g. “Delete city”) on the delete **`button`** in **`CityItem`** for screen readers until full behavior exists.
+- [ ] *(Optional)* Centralize **`BASE_URL`** via **`.env`** (`VITE_API_URL`) for dev/prod parity.
+
+[↑ top — 213. Lesson 213 — *Implementing the Cities List*](#-213-lesson-213--implementing-the-cities-list)
+
+
+
 
 
 

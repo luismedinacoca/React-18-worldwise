@@ -3926,6 +3926,417 @@ In **Worldwise**, this lesson sets up the **mental model** before you wire **cit
 
 
 
+<br>
+
+## 🔧 216. Lesson 216 — *Dynamic Routes With URL Parameters*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [216. Lesson 216 — *Dynamic Routes With URL Parameters*](#-216-lesson-216--dynamic-routes-with-url-parameters)
+- [216.1 Context](#-2161-context)
+- [216.2 Updating code according the context](#-2162-updating-codetheory-according-the-context)
+  - [216.2.1 Register a nested route for city detail](#21621-register-a-nested-route-for-city-detail)
+  - [216.2.2 City component stub with temporary data](#21622-city-component-stub-with-temporary-data)
+  - [216.2.3 Absolute Link paths for index vs cities routes](#21623-absolute-link-paths-for-index-vs-cities-routes)
+  - [216.2.4 Reading the dynamic segment with useParams](#21624-reading-the-dynamic-segment-with-useparams)
+  - [216.2.5 Top-level route paths with leading slashes in App](#21625-top-level-route-paths-with-leading-slashes-in-app)
+- [216.3 Issues](#-2163-issues)
+- [216.4 Pending Fixes (TODO)](#-2164-pending-fixes-todo)
+
+### 🧠 216.1 Context:
+
+**Dynamic routes with URL parameters** let a single route **pattern** match many concrete URLs by declaring **named placeholders** in the path (for example `:id`). React Router fills those placeholders from the current location; your components read them with **`useParams()`**. The URL becomes a **stable identifier** for a resource (here, a city), so deep links like `/app/cities/56283910` load the correct detail view without extra global state.
+
+In **Worldwise**, nested routes under **`/app`** combine a **static segment** (`cities`) with a **dynamic segment** (`:id`) so the list and the detail share one URL hierarchy. **`Link`** targets must align with that pattern—especially when the same list appears on both the **index** route (`/app`) and **`/app/cities`**, where purely relative paths would resolve differently.
+
+**Key Concepts:**
+
+1. **Route params (dynamic segments)** — A path such as **`cities/:id`** declares that the final segment is captured as **`id`**; the value is always a **string** in the URL.
+2. **`useParams()`** — Returns an object of **param names → values** for the **currently matched** route (e.g. `{ id: "56283910" }`).
+3. **Nested routes** — Under **`path="app"`**, child paths like **`cities/:id`** build full paths such as **`/app/cities/:id`** when combined with the parent.
+4. **Absolute vs relative `to` in `<Link>`** — Paths starting with **`/`** are resolved from the **app root**; relative paths depend on the **current** route, which matters when two routes render the same list.
+5. **URL as the source of truth (incremental)** — This lesson wires **routing** and **links** first; resolving **`id`** to real city data from **`cities`** is a natural follow-up (see **216.4**).
+
+**Advantages:**
+- **Bookmarkable and shareable** city detail URLs.
+- **One declaration** (`:id`) instead of duplicating routes per city.
+- **Clear mapping** between address bar and screen, which pairs well with browser history.
+
+**Disadvantages / Gotchas:**
+- **Param values are strings** — Compare or coerce carefully when matching numeric IDs from JSON.
+- **Relative links** — Easy to generate wrong targets when **`CityList`** is mounted on more than one path (see **216.2.3**).
+- **No automatic data loading** — Params tell you **which** id; you still **look up** the city in **`cities`** (or fetch by id).
+- **Missing or unknown ids** — A bad or stale id needs a **not found** or fallback UX.
+
+**When to Consider Alternatives:**
+- **Many optional filters** — Prefer **query strings** (`useSearchParams`) for non-hierarchical state (see Lesson **215**).
+- **Highly dynamic segment counts** — Splats (`*`) or different route layouts may fit better than a single `:id`.
+- **Server-driven slugs** — If SEO needs **`/cities/lisbon`** instead of ids, model the param as a **slug** and resolve it on the server or in a loader.
+
+Implementation touchpoints in this project: **`src/App.jsx`** (nested **`Route path="cities/:id"`**), **`src/components/CityItem.jsx`** (**`to={\`/app/cities/${id}\`}`**), and **`src/components/City.jsx`** (**`useParams()`**).
+
+---
+
+### ⚙️ 216.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section **216.2** connects **declared** dynamic segments in **`App.jsx`**, **navigation** from **`CityItem`**, and **reading** the segment in **`City.jsx`**.
+- **216.2.1** adds **`cities/:id`** under **`/app`** so each city has a dedicated URL; the screenshot illustrates the resulting path in the bar.
+- **216.2.2** keeps **`City`** on **temporary data** while the route exists—focusing the lesson on **routing**, not yet on data joining.
+- **216.2.3** explains why **`/app/cities/${id}`** is used so links are correct from both **`/app`** and **`/app/cities`**.
+- **216.2.4** introduces **`useParams`** and a minimal UI showing **`id`** from the URL.
+- **216.2.5** repeats **`App.jsx`** with **root-level** routes written as **`path="product"`** (no leading **`/`**), which still match **`/product`** in v6—useful to compare with **216.2.1**’s **`path="/product"`** notation.
+
+---
+
+#### 216.2.1 Register a nested route for city detail
+
+**Subsection Summary:**
+- Adds **`import City`** and a **nested** route **`path="cities/:id"`** whose element is **`<City />`**.
+- The **`:id`** token names the **route parameter** that later maps to **`useParams().id`**.
+- **`CityList`** remains on **`index`** and **`cities`**; the new route is **sibling** to those, not a child of **`CityList`**.
+- The screenshot below shows how the browser URL reflects **`/app/cities/`** plus an identifier—consistent with this pattern.
+
+![City detail URL with dynamic segment](../img/section17-lecture216-001.png)
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+import CityList from "./components/CityList";
+import CountryList from './components/CountryList';
+import City from './components/City';                 // 👈🏽 ✅
+
+const BASE_URL = "http://localhost:8000"
+
+function App() {
+  const [cities, setCities] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchCities() {
+      try{
+        setIsLoading(true);
+        const res = await fetch(`${BASE_URL}/cities`);
+        const data = await res.json();
+        setCities(data);
+      } catch(error) {
+        console.error(error);
+        alert("There was an error loading data");
+      }
+      finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCities();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/product" element={<Product />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="cities" element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="cities/:id" element={<City />}/>                                                 {/* 👈🏽 ✅ */}
+          <Route path="countries" element={ <CountryList cities={cities} isLoading={isLoading} /> }/>
+          <Route path="form" element={<p>Form</p>}/>
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+#### 216.2.2 City component stub with temporary data
+
+**Subsection Summary:**
+- **`City`** is reachable at **`/app/cities/:id`**, but this step still uses a **hardcoded `currentCity`** (“Lisbon”) for a later lesson that will join URL **`id`** to **`cities`**.
+- The **full layout** (rows, Wikipedia link, **`ButtonBack`**) stays **commented out**; only a minimal **`<h1>City</h1>`** renders.
+- **`formatDate`** is defined but unused in the active return—dead code until the full UI is restored.
+- Demonstrates **incremental adoption**: route first, **data from URL** next.
+
+```jsx
+/* src/components/City.jsx */
+import styles from "./City.module.css";
+
+const formatDate = (date) =>
+  new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    weekday: "long",
+  }).format(new Date(date));
+
+function City() {
+  // TEMP DATA
+  const currentCity = {
+    cityName: "Lisbon",
+    emoji: "🇵🇹",
+    date: "2027-10-31T15:59:59.138Z",
+    notes: "My favorite city so far!",
+  };
+
+  const { cityName, emoji, date, notes } = currentCity;
+  return (
+    <h1>City</h1>
+  )
+  //return (
+    // <div className={styles.city}>
+    //   <div className={styles.row}>
+    //     <h6>City name</h6>
+    //     <h3>
+    //       <span>{emoji}</span> {cityName}
+    //     </h3>
+    //   </div>
+
+    //   <div className={styles.row}>
+    //     <h6>You went to {cityName} on</h6>
+    //     <p>{formatDate(date || null)}</p>
+    //   </div>
+
+    //   {notes && (
+    //     <div className={styles.row}>
+    //       <h6>Your notes</h6>
+    //       <p>{notes}</p>
+    //     </div>
+    //   )}
+
+    //   <div className={styles.row}>
+    //     <h6>Learn more</h6>
+    //     <a
+    //       href={`https://en.wikipedia.org/wiki/${cityName}`}
+    //       target="_blank"
+    //       rel="noreferrer"
+    //     >
+    //       Check out {cityName} on Wikipedia &rarr;
+    //     </a>
+    //   </div>
+
+    //   <div>
+    //     <ButtonBack />
+    //   </div>
+    // </div>
+  //);
+}
+
+export default City;
+```
+
+#### 216.2.3 Absolute Link paths for index vs cities routes
+
+**Subsection Summary:**
+- **`CityList`** is the **`index`** of **`/app`** **and** the element of **`/app/cities`**, so a **relative** link **`to={id}`** resolves to **`/app/<id>`** from index but **`/app/cities/<id>`** from cities—**inconsistent** with **`path="cities/:id"`**.
+- The fix is an **absolute** path **`/app/cities/${id}`** so the destination is **always** the nested dynamic route.
+- **`Link`** from **`react-router-dom`** performs client-side navigation without full page reloads.
+- The prose uses example host **`localhost:5173`**; the same idea applies to any base URL.
+
+🔥 🔥 🔥 
+
+Since you have `CityList` assigned to both the `index` route and the `cities` route—and you explicitly want to solve this — using a purely relative link like `to={${id}}` creates a conflict.
+
+Here is why:
+
+* If you are on `localhost:5173/app` (the index route) and use `to={${id}}`, it points to `localhost:5173/app/56283910`.
+* If you are on `localhost:5173/app/cities` and use `to={${id}}`, it points to `localhost:5173/app/cities/56283910`.
+
+To guarantee that the link always points straight to `localhost:5173/app/cities/56283910` no matter which of those two routes you are looking at it from, you should use the full absolute path in your Link. 
+
+Just update your `CityItem.jsx` to include the `/app` prefix:
+```jsx
+<Link className={styles.cityItem} to={`/app/cities/${id}`}>
+```
+
+Because this path starts with a slash `/`, React Router treats it as absolute from the root—but by spelling out the full route (`/app/cities/`), it perfectly lines up with your `<Route path="cities/:id" element={<City />}/>` parameter every single time
+
+
+```jsx
+/* src/components/CityItem.jsx */
+import { Link } from 'react-router-dom';                // 👈🏽 ✅  
+import styles from './CityItem.module.css';
+
+const formatDate = (date) => 
+  new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
+
+const CityItem = ( {city} ) => {
+  const { emoji, cityName, date, id } = city;
+  //console.log(city);
+
+  return (
+    <li>
+      <Link className={styles.cityItem} to={`/app/cities/${id}`}>   {/* 👈🏽 ✅ */}
+        <span className={styles.emoji}>{emoji}</span>
+        <h3 className={styles.name}>{cityName}</h3>
+        <time className={styles.date}>{formatDate(date)}</time>
+        <button className={styles.deleteBtn}>&times;</button>
+      </Link>
+    </li>
+  )
+}
+
+export default CityItem;
+```
+
+#### 216.2.4 Reading the dynamic segment with useParams
+
+**Subsection Summary:**
+- Imports **`useParams`** from **`react-router-dom`** and destructures **`id`** so it matches the **`:id`** segment in **`App.jsx`**.
+- **`console.log`** is a temporary aid to verify the param in DevTools when navigating from **`CityItem`**.
+- The UI shows **`City {id}`**, proving the **URL drives** what the component reads; **`TEMP DATA`** is still unrelated to **`id`** (intentional gap before lookup logic).
+- **`styles`** and **`formatDate`** remain **unused** in the active return until the full card UI is uncommented.
+
+```jsx
+/* src/components/City.jsx */
+import { useParams } from "react-router-dom";         // 👈🏽 ✅
+import styles from "./City.module.css";
+
+const formatDate = (date) =>
+  new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    weekday: "long",
+  }).format(new Date(date));
+
+function City() {
+    const { id } = useParams();                       // 👈🏽 ✅
+    console.log("CityId: ", id)                       // 👈🏽 ✅
+
+  // TEMP DATA
+  const currentCity = {
+    cityName: "Lisbon",
+    emoji: "🇵🇹",
+    date: "2027-10-31T15:59:59.138Z",
+    notes: "My favorite city so far!",
+  };
+
+  const { cityName, emoji, date, notes } = currentCity;
+  return (
+    <h1>City { id }</h1>                                {/* 👈🏽 ✅ */}
+  )
+}
+
+export default City;
+```
+
+![hover over Barcelona](../img/section17-lecture216-001.png)
+
+#### 216.2.5 Top-level route paths with leading slashes in App
+
+**Subsection Summary:**
+- Same structure as **216.2.1**, but **top-level** routes use **`path="product"`**-style strings **without** a leading **`/`** in the snippet—React Router v6 still matches **`/product`**, **`/pricing`**, **`/login`** at the **root** of the route tree (equivalent to **`/product`** here).
+- Highlights consistency: **`path="app"`** for the layout shell and nested **`cities/:id`** under it.
+- Serves as a **checkpoint** that **`City`** and **`cities/:id`** remain wired after normalizing path style.
+- Compare with **216.2.1** if your repo uses **`path="/product"`**—both styles are common; pick one project-wide.
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+import CityList from "./components/CityList";
+import CountryList from './components/CountryList';
+import City from './components/City';
+
+const BASE_URL = "http://localhost:8000"
+
+function App() {
+  const [cities, setCities] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchCities() {
+      try{
+        setIsLoading(true);
+        const res = await fetch(`${BASE_URL}/cities`);
+        const data = await res.json();
+        setCities(data);
+      } catch(error) {
+        console.error(error);
+        alert("There was an error loading data");
+      }
+      finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCities();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="product" element={<Product />} />                        {/* 👈🏽 ✅ */}
+        <Route path="pricing" element={<Pricing />} />                        {/* 👈🏽 ✅ */}
+        <Route path="login" element={<Login />} />                            {/* 👈🏽 ✅ */}
+        <Route path="app" element={<AppLayout />}>                            {/* 👈🏽 ✅ */}
+          <Route index element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="cities" element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="cities/:id" element={<City />}/>
+          <Route path="countries" element={ <CountryList cities={cities} isLoading={isLoading} /> }/>
+          <Route path="form" element={<p>Form</p>}/>
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+### 🐞 216.3 Issues:
+
+- **`City` shows URL `id` but still displays Lisbon from `TEMP DATA`**: The param is wired, but the **detail content** does not yet reflect the **selected city**—confusing when **`id`** ≠ Lisbon’s id.
+- **`console.log` in `City`**: Debugging noise in **`src/components/City.jsx`** should be removed or guarded before production.
+- **Commented full UI**: Rows, notes, Wikipedia link, and **`ButtonBack`** are disabled; **accessibility** and layout from the design are not active.
+- **Doc vs repo path style**: **216.2.1** uses **`path="/product"`** while **216.2.5** / current **`src/App.jsx`** use **`path="product"`**—behavior is equivalent at root, but the mismatch can confuse readers.
+- **`CityItem` delete control**: The **×** **`button`** inside **`Link`** may trigger nested interactive control issues; no **`onClick`** handler yet (out of scope for this lesson).
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| `TEMP DATA` out of sync with `useParams().id` | ⚠️ Identified | `src/components/City.jsx:16-26` — Lisbon stub while heading shows **`id`** from URL |
+| `console.log` left in `City` | ℹ️ Low Priority | `src/components/City.jsx:14` — `console.log("CityId: ", id)` |
+| Full city detail UI commented out | ℹ️ Informational | `src/components/City.jsx:28-64` — commented **`return`**; only **`<h1>City {id}</h1>`** active |
+| Leading slash inconsistency in `App` route snippets | ℹ️ Informational | `docs/LECTURE_STEPS.md` **216.2.1** vs **216.2.5** vs `src/App.jsx:41-43` |
+| Delete button inside `Link` | ℹ️ Low Priority | `src/components/CityItem.jsx:20-21` — consider **`preventDefault`** pattern or move button outside |
+
+### 🧱 216.4 Pending Fixes (TODO)
+
+- [ ] **Resolve city from `id`**: In `src/components/City.jsx`, replace the **Lisbon** object (~lines 16–22) with **`cities.find((c) => String(c.id) === id)`** (or strict equality if types match). Pass **`cities`** via **`useOutletContext`** from `AppLayout` / `App`, or lift a shared context—align with the next course step.
+- [ ] **Handle unknown `id`**: If no city matches, render **`Navigate`** to `/app/cities` or a small “City not found” message (~`City.jsx` after lookup).
+- [ ] **Remove or gate `console.log`**: Delete line ~14 in `src/components/City.jsx` or wrap in `import.meta.env.DEV` (Vite) / `process.env.NODE_ENV === "development"`.
+- [ ] **Restore full `City` UI**: Uncomment the styled **`return`** in `src/components/City.jsx` (~lines 28–64) and bind **`cityName`**, **`emoji`**, **`date`**, **`notes`** from the **found** city, not **`TEMP DATA`**.
+- [ ] **Unify `App.jsx` path style**: Choose **`path="/product"`** or **`path="product"`** for root routes in `src/App.jsx` (lines 41–43) and match the **216.2.1** doc snippet for learner consistency.
+- [ ] **`CityItem` delete UX**: Either implement delete handler with **`e.preventDefault()`** on the button or restructure so the **×** is not a nested **button** inside **`Link`** (see `src/components/CityItem.jsx:17-22`).
+
+[↑ top — 216. Lesson 216 — *Dynamic Routes With URL Parameters*](#-216-lesson-216--dynamic-routes-with-url-parameters)
+
+
+
 
 
 

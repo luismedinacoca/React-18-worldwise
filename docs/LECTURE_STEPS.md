@@ -3446,16 +3446,357 @@ export default CityList
 
 
 
+<br>
+
+## 🔧 214. Lesson 214 — *Implementing the Countries List*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [214. Lesson 214 — *Implementing the Countries List*](#-214-lesson-214--implementing-the-countries-list)
+- [214.1 Context](#-2141-context)
+- [214.2 Updating code according the context](#-2142-updating-codetheory-according-the-context)
+  - [214.2.1 Seeding `data/cities.json` with multiple cities](#21421-seeding-datacitiesjson-with-multiple-cities)
+  - [214.2.2 CountryList: first pass (city rows re-used)](#21422-countrylist-first-pass-city-rows-re-used)
+  - [214.2.3 App: mounting `CountryList` on `/countries`](#21423-app-mounting-countrylist-on-countries)
+  - [214.2.4 CountryList: stub with `CountryItem` and empty `countries`](#21424-countrylist-stub-with-countryitem-and-empty-countries)
+  - [214.2.5 CountryList: unique countries via `Set` and derived emoji](#21425-countrylist-unique-countries-via-set-and-derived-emoji)
+- [214.3 Issues](#-2143-issues)
+- [214.4 Pending Fixes (TODO)](#-2144-pending-fixes-todo)
+
+### 🧠 214.1 Context:
+
+**Implementing the Countries List** turns the **same `cities` collection** you already fetch in **`App`** into a **second view**: one **row per distinct country**, not per city. Users may visit several cities in **Spain**; the **Countries** sidebar should list **Spain once** (with a representative **flag emoji**), alongside **Portugal**, **Germany**, etc.
+
+You **derive** countries **client-side** from `cities`: extract each city’s **`country`** string, **deduplicate** (e.g. with **`Set`**), then build small objects **`{ country, emoji }`** for **`CountryItem`**. **`CountryList`** mirrors **`CityList`**: **`Spinner`** while loading, **`Message`** when there are no cities yet, then a **`<ul>`** of **`CountryItem`** rows. The **`/app/countries`** route receives the same **`cities`** and **`isLoading`** props as **`CityList`**, so **no second network request** is required for this screen.
+
+**Key Concepts:**
+
+1. **Aggregation in the UI** — Reduce many city records to a smaller list of unique countries without changing the API.
+2. **`Set` for uniqueness** — `new Set(array)` removes duplicate `country` strings; spread back to an array for `.map`.
+3. **Stable list keys** — Use `key={country.country}` because the country name is unique in the derived list (same idea as `city.id` for cities).
+4. **Emoji from any matching city** — `cities.find(c => c.country === country)?.emoji` picks one city’s emoji per country (all cities in the same country should share the same emoji in the seed data).
+5. **Iterative UI build** — Start by reusing the city list pattern, wire the route, then replace mapping with **country-specific** components and styles.
+
+**Advantages:**
+- Reuses existing **`fetch`** and **`App`** state; **DRY** data loading.
+- **`Set`** keeps deduplication readable compared to manual **`reduce`** / nested **`includes`** checks.
+- **Route-level composition** — `/countries` is a sibling of `/cities` under **`AppLayout`**, consistent with the app shell.
+
+**Disadvantages / Gotchas:**
+- **Order** — `Set` iteration order is insertion order in modern JS, but the **order of countries** follows first occurrence in `cities`, not alphabetical, unless you **sort** explicitly.
+- **`find` per country** — For very large lists, pairing emoji could be optimized (e.g. a **`Map`**)—not needed for a travel diary scale.
+- **First-pass snippet** (214.2.2) may still use **`cityList`** / **`CityItem`** for cities—a pedagogical step, not the final UX (see **214.3**).
+
+**When to Consider Alternatives:**
+- **Server-side grouping** — If the API should return **countries** as a first-class resource with counts, expose **`GET /countries`** instead of deriving in the client.
+- **`useMemo`** — If `cities` updates often and the derivation is heavy, memoize the `countries` array (usually unnecessary here).
+- **i18n** — Display names might come from a locale-aware catalog rather than raw `country` strings alone.
+
+In **Worldwise**, this lesson extends **`data/cities.json`**, adds **`src/components/CountryList.jsx`** (and **`CountryItem`** usage), and updates **`src/App.jsx`** so **`path="countries"`** renders **`CountryList`** with **`cities`** and **`isLoading`**.
+
+---
+
+### ⚙️ 214.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section **214.2** moves from **seed data** to a working **Countries** view: **populate JSON**, create **`CountryList`**, **connect the route**, then **replace** the temporary “list of cities” approach with **unique countries** and **`CountryItem`**.
+- **214.2.1** adds several cities (and countries) so deduplication is visible (**Spain** and **Portugal** appear more than once in city rows).
+- **214.2.2** shows an **intermediate** implementation that still lists **cities** like **`CityList`**—useful to copy-paste, then **fix** in **214.2.4–214.2.5**.
+- **214.2.3** imports **`CountryList`** and swaps the **`/app/countries`** placeholder for the real component with **props**.
+- **214.2.4** switches to **`CountryItem`** and a **`countries`** array **stub** (empty), preparing the final shape.
+- **214.2.5** implements **`Set` + `.map`** to build **`{ country, emoji }`**, uses **`styles.countryList`**, and passes **`key={country.country}`** to **`CountryItem`**.
+
+---
+
+#### 214.2.1 Seeding `data/cities.json` with multiple cities
+
+**Subsection Summary:**
+- Expands **`data/cities.json`** so the app has **several cities** across **Portugal**, **Spain**, and **Germany**, with **Barcelona** and **Porto** (and others) ensuring **duplicate country names** appear when listing cities.
+- Demonstrates the **json-server** shape: top-level **`cities`** array with **`cityName`**, **`country`**, **`emoji`**, **`date`**, **`notes`**, **`position`**, and **`id`** fields used elsewhere in the course.
+
+* Updating json information.
+* adding 2 cities.
+
+```json
+/* data/cities.json */
+{
+  "cities": [
+    {
+      "cityName": "Lisbon",
+      "country": "Portugal",
+      "emoji": "🇵🇹",
+      "date": "2027-10-31T15:59:59.138Z",
+      "notes": "My favorite city so far!",
+      "position": {
+        "lat": 38.727881642324164,
+        "lng": -9.140900099907554
+      },
+      "id": 73930385
+    },
+    {
+      "cityName": "Madrid",
+      "country": "Spain",
+      "emoji": "🇪🇸",
+      "date": "2027-07-15T08:22:53.976Z",
+      "notes": "",
+      "position": {
+        "lat": 40.46635901755316,
+        "lng": -3.7133789062500004
+      },
+      "id": 17806751
+    },
+    {
+      "cityName": "Berlin",
+      "country": "Germany",
+      "emoji": "🇩🇪",
+      "date": "2027-02-12T09:24:11.863Z",
+      "notes": "Amazing 😃",
+      "position": {
+        "lat": 52.53586782505711,
+        "lng": 13.376933665713324
+      },
+      "id": 98443197
+    },
+    {
+      "cityName": "Barcelona",
+      "country": "Spain",
+      "emoji": "🇪🇸",
+      "date": "2027-05-20T14:10:22.500Z",
+      "notes": "Loved the architecture and beaches!",
+      "position": {
+        "lat": 41.385063,
+        "lng": 2.173404
+      },
+      "id": 56283910
+    },
+    {
+      "cityName": "Porto",
+      "country": "Portugal",
+      "emoji": "🇵🇹",
+      "date": "2027-09-10T11:45:30.250Z",
+      "notes": "Beautiful riverside and wine cellars.",
+      "position": {
+        "lat": 41.157944,
+        "lng": -8.629105
+      },
+      "id": 84726159
+    }
+  ]
+}
+```
+
+---
+
+#### 214.2.2 CountryList: first pass (city rows re-used)
+
+**Subsection Summary:**
+- Copies the **`CityList`** structure: **`Spinner`**, empty **`Message`**, **`ul`**, and **`cities.map`** → **`CityItem`** with **`city.id`** as **`key`**.
+- Still uses **`styles.cityList`** (city list styles) and lists **cities**, not aggregated countries—this is a **deliberate intermediate** step before **`CountryItem`** and **`countryList`** styles in **214.2.4–214.2.5**.
+
+```jsx
+/* src/components/CountryList.jsx */
+import Spinner from './Spinner';
+import CityItem from './CityItem';
+import Message from './Message';
+import styles from './CountryList.module.css';
 
 
+const CountryList = ({ cities, isLoading }) => {
+  if(isLoading) return <Spinner />;
+
+  if(!cities.length) return <Message message='Add your first city by clicking on a city on the map' />
+
+  return (
+    <ul className={styles.cityList}>
+      {cities.map(city => (
+        <CityItem city={city} key={city.id} />
+      ))}
+    </ul>
+  )
+}
+
+export default CountryList
+```
+
+---
+
+#### 214.2.3 App: mounting `CountryList` on `/countries`
+
+**Subsection Summary:**
+- Imports **`CountryList`** and renders it for **`path="countries"`**, passing **`cities`** and **`isLoading`** from the same **`App`** state used by **`CityList`**.
+- Confirms **nested routing**: **`/app/countries`** shows the countries sidebar content inside **`AppLayout`**’s **`<Outlet />`**.
+
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+import CityList from "./components/CityList";
+import CountryList from './components/CountryList';           // 👈🏽 ✅
+
+const BASE_URL = "http://localhost:8000"
+
+function App() {
+  const [cities, setCities] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchCities() {
+      try{
+        setIsLoading(true);
+        const res = await fetch(`${BASE_URL}/cities`);
+        const data = await res.json();
+        setCities(data);
+      } catch(error) {
+        console.error(error);
+        alert("There was an error loading data");
+      }
+      finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCities();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="/product" element={<Product />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="cities" element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="countries" element={ <CountryList cities={cities} isLoading={isLoading} /> }/>   {/* 👈🏽 ✅ */}
+          <Route path="form" element={<p>Form</p>}/>
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+---
+
+#### 214.2.4 CountryList: stub with `CountryItem` and empty `countries`
+
+**Subsection Summary:**
+- Swaps **`CityItem`** for **`CountryItem`** and prepares a **`countries`** array, initially **empty**, so the UI renders **no rows** until **214.2.5** fills the derivation logic.
+- **`CountryItem`** is rendered **without** a **`key`** here—**React** will warn in dev until **214.2.5** adds **`key={country.country}`**.
+
+```jsx
+/* src/components/CountryList.jsx */
+import Spinner from './Spinner';
+import CountryItem from './CountryItem';
+import Message from './Message';
+import styles from './CountryList.module.css';
 
 
+const CountryList = ({ cities, isLoading }) => {
+  if(isLoading) return <Spinner />;
+
+  if(!cities.length) return <Message message='Add your first city by clicking on a city on the map' />
+
+  const countries = [];
+  return (
+    <ul className={styles.cityList}>
+      {countries.map(country => (
+        <CountryItem country={country}/>
+      ))}
+    </ul>
+  )
+}
+
+export default CountryList
+```
+
+---
+
+#### 214.2.5 CountryList: unique countries via `Set` and derived emoji
+
+**Subsection Summary:**
+- Builds **`countries`** as **`[...new Set(cities.map(c => c.country))]`** so each **country name** appears **once**, then maps to **`{ country, emoji }`** using **`cities.find(...)`** for the flag.
+- Includes a **commented `reduce`** alternative showing the same uniqueness idea without **`Set`**.
+- Uses **`styles.countryList`** (from **`CountryList.module.css`**) and **`key={country.country}`** on **`CountryItem`** for correct reconciliation and accessibility-friendly list semantics.
+
+```jsx
+/* src/components/CountryList.jsx */
+import Spinner from './Spinner';
+import CountryItem from './CountryItem';
+import Message from './Message';
+import styles from './CountryList.module.css';
 
 
+const CountryList = ({ cities, isLoading }) => {
+  if(isLoading) return <Spinner />;
+
+  if(!cities.length) return <Message message='Add your first city by clicking on a city on the map' />
+
+  const countries = [...new Set(cities.map(c => c.country))]
+  .map(country => ({
+    country,
+    emoji: cities.find(c => c.country === country)?.emoji
+  }));
+
+  // const countries = cities.reduce( (arr, city) => {
+  //   if(!arr.map((el) => el.country).includes(city.country))
+  //     return [...arr, {country: city.country, emoji: city.emoji}]
+  //   else return arr;
+  // }, []);
+
+  //console.log(countries);
+  return (
+    <ul className={styles.countryList}>
+      {countries.map(country => (
+        <CountryItem country={country} key={country.country}/>
+      ))}
+    </ul>
+  )
+}
+
+export default CountryList
+```
 
 
+### 🐞 214.3 Issues:
 
+- **214.2.2 still lists cities, not countries**: The first **`CountryList`** version maps **`cities`** to **`CityItem`** and uses **`styles.cityList`**—semantically it is a **city list** inside the Countries route; **214.2.5** fixes the data and styles.
+- **214.2.4 missing `key` on `CountryItem`**: In the stub, **`<CountryItem country={country}/>`** has no **`key`** inside **`.map`**; React expects **`key`** on list children (**214.2.5** adds **`key={country.country}`**).
+- **214.2.4 uses `styles.cityList`**: The **`ul`** still references **`cityList`** from **`CountryList.module.css`**; **`countryList`** is the intended class (**214.2.5**).
+- **Empty-state copy**: **`Message`** text still says “Add your first **city**…” which fits **Cities**; on **Countries** you may want different wording (see **214.4**).
+- **`CountryItem` accessibility**: **`src/components/CountryItem.jsx`** renders flag and name in **`<span>`**s without **`aria-label`**—screen readers get less context than a labeled row (optional hardening).
 
+| Issue | Status | Log/Error |
+|---|---|---|
+| Intermediate `CountryList` lists cities via `CityItem` | ℹ️ Informational | `docs/LECTURE_STEPS.md` (214.2.2): `cities.map` → `CityItem`; pedagogical step before aggregation in **214.2.5** |
+| Missing `key` on `CountryItem` in stub | ⚠️ Identified | `docs/LECTURE_STEPS.md` (214.2.4): `<CountryItem country={country}/>` — compare **214.2.5** / `src/components/CountryList.jsx:27-28` |
+| Wrong CSS module class (`cityList` vs `countryList`) in stub | ⚠️ Identified | `docs/LECTURE_STEPS.md` (214.2.4): `className={styles.cityList}` vs `src/components/CountryList.jsx:26` `styles.countryList` |
+| Generic empty message on Countries route | ℹ️ Low Priority | `src/components/CountryList.jsx:10`: same `Message` as `CityList` — consider route-specific text |
+| `CountryItem` spans lack accessible names | ℹ️ Low Priority | `src/components/CountryItem.jsx:6-8`: emoji + country text without `aria-label` on `<li>` |
+
+---
+
+### 🧱 214.4 Pending Fixes (TODO)
+
+- [ ] **Optional copy tweak**: In `src/components/CountryList.jsx` (empty branch, ~line 10), pass a **Countries-specific** `message` prop (e.g. “Add a city from the map to see countries here”) so the empty state matches the **Countries** nav item.
+- [ ] **Sort countries for UX**: After building `countries` in `src/components/CountryList.jsx` (~lines 12–16), call **`.sort((a, b) => a.country.localeCompare(b.country))`** (or sort the string array before mapping) so the list order is predictable.
+- [ ] **Accessibility**: On `src/components/CountryItem.jsx`, add an **`aria-label`** on the root **`<li>`** that combines the country name and emoji, or set **`aria-hidden`** on the flag span and expose the country name as the primary accessible text.
+- [ ] **Course doc alignment**: Keep **214.2.2** as the “wrong first pass” or add a one-line callout that **`CityItem` + `cityList`** are placeholders until **214.2.5**—learners should not ship **214.2.2** as the final Countries UI.
+
+[↑ top — 214. Lesson 214 — *Implementing the Countries List*](#-214-lesson-214--implementing-the-countries-list)
+
+<br>
 
 
 ---

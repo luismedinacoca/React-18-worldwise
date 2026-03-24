@@ -3801,6 +3801,167 @@ export default CountryList
 
 ---
 
+
+<br>
+
+## 🔧 215. Lesson 215 — *Storing State in the URL*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [215. Lesson 215 — *Storing State in the URL*](#-215-lesson-215--storing-state-in-the-url)
+- [215.1 Context](#-2151-context)
+- [215.2 Updating code according the context](#-2152-updating-codetheory-according-the-context)
+  - [215.2.1 Why React Router and URL-based UI state](#21521-why-react-router-and-url-based-ui-state)
+  - [215.2.2 URL anatomy: path, route params, and query string](#21522-url-anatomy-path-route-params-and-query-string)
+  - [215.2.3 Params vs query string (illustrated)](#21523-params-vs-query-string-illustrated)
+- [215.3 Issues](#-2153-issues)
+- [215.4 Pending Fixes (TODO)](#-2154-pending-fixes-todo)
+
+### 🧠 215.1 Context:
+
+**Storing state in the URL** means representing part of your application’s **UI or navigation state** directly in the **address bar**—as **path segments**, **route parameters**, or **query string** pairs—instead of (or in addition to) **React component state** alone. React Router already keeps the UI in sync with the URL; when you **encode** filters, selection, map position, or panel visibility in the URL, users get **shareable links**, **bookmarkable** views, and **back/forward** behavior that matches expectations.
+
+Typical split: **path / params** identify *what resource* you are looking at (e.g. which city), while the **query string** often holds *secondary* or *optional* state (sort order, map center, open sidebar). Together they form a **single source of truth** that survives refresh and can be sent to someone else.
+
+**Key Concepts:**
+
+1. **URL as serializable state** — The location string is a plain-text snapshot of part of your UI; updating it with React Router updates what users see and what they can copy.
+2. **Path vs route params** — The **path pattern** (e.g. `/app/cities/:cityId`) declares **named segments**; concrete values (e.g. `lisbon`) are **params** (`useParams()` in React Router v6).
+3. **Query string (search)** — Everything after `?` (`lat=…&lng=…`) is **search** state; read/write with **`useSearchParams()`** (or `location.search` + manual parsing).
+4. **UI state suitable for the URL** — Selection, filters, sort, pagination, **map viewport**, which tab/panel is open—especially when you want **deep linking**.
+5. **What often stays in React state** — Transient input while typing, animation toggles, purely local hover/focus—unless the product needs them in the URL.
+
+**Advantages:**
+- **Shareable and bookmarkable** views (same URL → same screen).
+- **Browser history** (back/forward) aligns with navigation and filters when the URL drives the view.
+- **Refresh-safe** — State encoded in the URL can survive reload; purely in-memory state cannot.
+- **Clear mental model** — “Where am I?” is visible in the bar and in server logs when applicable.
+
+**Disadvantages / Gotchas:**
+- **Noise and length** — Long query strings are hard to read; sensitive data must not live in URLs.
+- **Parsing and validation** — Params and search values are **strings**; you must coerce types and handle invalid/missing values.
+- **Coupling** — Over-encoding UI details in the URL can make routes brittle when layouts change.
+- **SEO and privacy** — Query params are visible to analytics and referrers; do not put secrets there.
+
+**When to Consider Alternatives:**
+- **Sensitive or large payloads** — Use **session storage**, **server session**, or **POST** bodies instead of query strings.
+- **Very chatty UI** — High-frequency updates (e.g. every map pan) may debounce URL updates or keep position in state until “share” or navigation.
+- **Non-web surfaces** — Embedded WebViews or native apps might prefer app-specific state APIs over long URLs.
+
+In **Worldwise**, this lesson sets up the **mental model** before you wire **city selection** and **map coordinates** into routes like `/app/cities` with a **city id** in the path and **`lat` / `lng`** (or similar) in the **search** string—matching the course diagrams. The current codebase still loads **`cities`** in **`App.jsx`** and lists them on **`/app/cities`** without dynamic segments or search params (**`src/App.jsx`**, **`CityList`**, **`City.jsx`** with temp data); upcoming steps will connect the URL to real components.
+
+---
+
+### ⚙️ 215.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section **215.2** explains **why** React Router makes **URL-driven UI** practical and **how** to read a URL: **base path**, **dynamic segments (params)**, and **query string** for extra state.
+- **215.2.1** lists **motivation** and **examples** of UI state that belong in the URL (panels, selection, sort, filters).
+- **215.2.2** uses a **screenshot** of a concrete URL and labels **path**, **param-style segment**, and **query** (`lat`, `lng`).
+- **215.2.3** uses a **second diagram** to reinforce the distinction between **params** and **query string**—the same ideas you will implement with **`useParams`** and **`useSearchParams`** later in the project.
+
+---
+
+#### 215.2.1 Why React Router and URL-based UI state
+
+**Subsection Summary:**
+- States the **usefulness of React Router** for keeping the **view aligned with the URL** and for **navigation APIs** (`<Link>`, `useNavigate`).
+- Argues for **storing UI state in the URL** so bookmarks, sharing, and history work naturally.
+- Gives **concrete UI examples**: **open/closed panels**, **selected list item**, **sort order**, **filters**—all candidates for path or search encoding.
+  * open/closed panels
+  * selected list item
+  * list sorting order
+  * apply list filters
+- No project files are edited here; this is **conceptual groundwork** for later **`App.jsx`** / **`City`** routing.
+
+#### 215.2.2 URL anatomy: path, route params, and query string
+
+**Subsection Summary:**
+- The image **`section17-lecture215-001.png`** shows a **realistic Worldwise-style URL** and splits it into **path**, **city segment**, and **geographic query**—how the course visualizes “state in the bar.”
+- The **path** **`/app/cities`** is the **static route prefix** for the cities area; the next segment stands in for a **selected city slug or id** (here illustrated as **`lisbon`**).
+- The **query string** **`lat=38.728&lng=-9.141`** carries **numeric map position** (or similar) **without** changing which **city resource** is primary—classic **search** state.
+- Together this matches React Router’s split: **`useParams`** for **`:cityId`** / slug, **`useSearchParams`** for **`lat`** and **`lng`**.
+
+![URL for State Management](../img/section17-lecture215-001.png)
+
+* path: `/app/cities`
+* params: `/lisbon` (city identifier segment in the path—e.g. slug or id matched by a dynamic route)
+* query string: `lat=38.728&lng=-9.141`
+
+#### 215.2.3 Params vs query string (illustrated)
+
+**Subsection Summary:**
+- The image **`section17-lecture215-002.png`** complements the first: it usually **contrasts** **route parameters** (part of the path hierarchy) with **query parameters** (after `?`).
+- Reinforces that **params** identify **which entity** (e.g. which city) while **query** often holds **auxiliary** or **optional** data (coordinates, filters).
+- Prepares for **consistent naming** in code: **`useParams()`** returns param objects; **`useSearchParams()`** returns **`URLSearchParams`**-like getters/setters.
+- Use these figures when implementing **`Route path="cities/:cityId"`** and **`?lat=&lng=`** in **Worldwise** so the **bar**, **map**, and **list** stay in sync.
+
+![Params and Query String](../img/section17-lecture215-002.png)
+
+### 🐞 215.3 Issues:
+
+- **URL state not implemented yet**: **`src/App.jsx`** only declares static routes (`cities`, `countries`, `form`); there is no **`cities/:cityId`** or **search** wiring—expected **before** the next implementation lessons.
+- **`City.jsx` is disconnected from routing**: **`src/components/City.jsx`** uses **hard-coded `currentCity` (TEMP DATA)** instead of **params** or **loader** data, so the URL cannot drive the detail view yet.
+- **Doc phrasing in 215.2.2**: Listing **params** as **`/lisbon`** is **pedagogical**; in React Router the **param value** is typically **`lisbon`** while the **pattern** is **`/app/cities/:citySlug`**—learners should map the diagram to **`useParams()`**, not a second leading slash.
+- **Risk of putting secrets in query strings**: Any token or PII must **not** follow the **`lat`/`lng`** pattern in production URLs.
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| No dynamic city route or `useSearchParams` in app yet | ℹ️ Informational | `src/App.jsx:43-47` — only `path="cities"` / `countries` / `form`; aligns with lesson order before URL state implementation |
+| `City` detail uses temp data, not URL | ℹ️ Informational | `src/components/City.jsx:12-18` — `currentCity` object literal; no `useParams` / `useOutletContext` |
+| “params: `/lisbon`” can confuse param vs path | ℹ️ Informational | `docs/LECTURE_STEPS.md` (215.2.2): clarify as **segment value** `lisbon` for `:citySlug` vs full path |
+| Query string must not carry sensitive data | ℹ️ Low Priority | General: `lat`/`lng` are fine for map demos; never put auth tokens in search |
+
+### 🧱 215.4 Pending Fixes (TODO)
+
+- [ ] **Add a dynamic route** in `src/App.jsx` (nested under `/app`), e.g. **`path="cities/:cityId"`** (or `:citySlug`), rendering a **`City`** (or **`CityDetail`**) that reads **`cityId`** via **`useParams()`**.
+- [ ] **Replace `TEMP DATA` in `src/components/City.jsx`** (~lines 12–18) by resolving the city from **`cities`** (from **`useOutletContext`**, loader, or parent state) using **`useParams().cityId`** so the URL is the source of truth.
+- [ ] **Persist map position in the search string**: in the **`Map`** component (e.g. `src/components/Map.jsx`), sync center/zoom with **`useSearchParams()`** for **`lat`**, **`lng`** (and optional **`zoom`**) so URLs match **215.2.2**’s example shape.
+- [ ] **Validate and coerce query params**: parse **`Number(lat)`** / **`Number(lng)`**, fall back to defaults when missing or **NaN**, to avoid broken map state from malformed links.
+- [ ] **Course doc polish**: Optionally add one line under **215.2.2** noting that **`lisbon`** is the **value** of a **dynamic segment**, not a standalone path starting with `/`.
+
+[↑ top — 215. Lesson 215 — *Storing State in the URL*](#-215-lesson-215--storing-state-in-the-url)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <br>
 <br>
 <br>

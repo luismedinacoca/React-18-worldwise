@@ -4195,7 +4195,7 @@ const CityItem = ( {city} ) => {
 export default CityItem;
 ```
 
-#### 216.2.4 Reading the dynamic segment with useParams
+#### 216.2.4 Reading the dynamic segment with `useParams`
 
 **Subsection Summary:**
 - Imports **`useParams`** from **`react-router-dom`** and destructures **`id`** so it matches the **`:id`** segment in **`App.jsx`**.
@@ -4640,15 +4640,456 @@ export default Map;
 
 
 
+<br>
 
+## 🔧 218. Lesson 218 — *Programmatic Navigation with useNavigate*
 
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
 
+### 📑 Table of Contents:
+- [218. Lesson 218 — *Programmatic Navigation with useNavigate*](#-218-lesson-218--programmatic-navigation-with-usenavigate)
+- [218.1 Context](#-2181-context)
+- [218.2 Updating code/theory according the context](#-2182-updating-codetheory-according-the-context)
+  - [218.2.1 Registering the Form route in App](#21821-registering-the-form-route-in-app)
+  - [218.2.2 Imperative navigation on the Map with `useNavigate`](#21822-imperative-navigation-on-the-map-with-usenavigate)
+  - [218.2.3 Reusable `Button` component](#21823-reusable-button-component)
+  - [218.2.4 Form with `Button` for Add and Back](#21824-form-with-button-for-add-and-back)
+  - [218.2.5 `useNavigate` and `navigate(-1)` on Back](#21825-usenavigate-and-navigate-1-on-back)
+  - [218.2.6 `preventDefault` on Back inside the form](#21826-preventdefault-on-back-inside-the-form)
+- [218.3 Issues](#-2183-issues)
+- [218.4 Pending Fixes (TODO)](#-2184-pending-fixes-todo)
 
+### 🧠 218.1 Context:
 
+**Programmatic navigation** means changing the current route (URL and matched components) from **JavaScript**—for example after a button click, a timer, or an API response—without requiring the user to activate a **`<Link>`**. In React Router v6, the **`useNavigate`** hook returns a **`navigate`** function that can **push** or **replace** a path, go **back** or **forward** in history (`navigate(-1)`), or pass **state**.
 
+This lesson connects **declarative** navigation (**`<Link to="…">`**, which describes *where* to go in JSX) with **imperative** navigation (**`navigate(…)`**, which you call when some logic decides it is time to move). Typical uses: closing a wizard step, redirecting after login, “Back” that mirrors the browser back button, or jumping to a nested route like **`form`** from the map.
 
+In **Worldwise**, the **`Form`** page is registered under **`/app/form`**, **`Map`** navigates to **`form`** when the map area is clicked, and the **Back** button uses **`navigate(-1)`** so the user returns to the previous history entry—often the city or map view they came from.
 
+**Key Concepts:**
 
+1. **`useNavigate()`** — A hook that must be used **inside** a component tree wrapped by React Router (e.g. under **`BrowserRouter`**). It returns **`navigate`**, a stable function for imperative navigation.
+2. **Relative paths** — From a route like **`/app/cities/123`**, calling **`navigate('form')`** resolves to **`/app/form`** (relative to the current route’s parent), which matches the nested **`path="form"`** route in **`App.jsx`**.
+3. **History delta** — **`navigate(-1)`** is equivalent to the browser **Back** button: it pops one entry off the history stack (if there is a previous page in the same tab session).
+4. **Buttons inside `<form>`** — A **`<button>`** without an explicit **`type`** defaults to **`type="submit"`** in HTML. Click handlers that only call **`navigate`** may still need **`e.preventDefault()`** so the form does not submit and reload behavior stays predictable.
+5. **Separation of concerns** — **`Button`** is a small presentational wrapper so **`Form`** can attach **`onClick`** handlers (e.g. Back) without duplicating class names.
+
+**Advantages:**
+- Navigation can follow **business rules** (validation, async work) before changing the URL.
+- **`navigate(-1)`** gives a **consistent “Back”** UX aligned with browser history.
+- Relative navigation keeps URLs correct under nested layouts (**`/app/...`**).
+- Programmatic API complements **`<Link>`** without replacing it for primary navigation.
+
+**Disadvantages / Gotchas:**
+- Over-using **`navigate`** for every transition makes flow **harder to see** than declarative links; reserve it for **conditional** or **event-driven** moves.
+- **`navigate(-1)`** depends on **actual history**; if the user landed directly on the form, “back” may leave the app or go somewhere unexpected—sometimes you need an explicit path instead.
+- **Event bubbling**: Clicks on **child** elements (e.g. “Change position”) may **bubble** to a parent **`onClick`** that also calls **`navigate`**—can cause **double actions** unless **`stopPropagation`** is used where appropriate.
+- **Accessibility**: Relying on **`div onClick`** for navigation is weaker than a **button** or **link** for keyboard users unless you add roles and keyboard handlers.
+
+**When to Consider Alternatives:**
+- Prefer **`<Link>`** or **`<NavLink>`** for **static** navigation in the UI (menus, list items).
+- Use **`<Navigate replace>`** or a **loader/redirect** when the route itself should **guard** access (e.g. auth), not only a button.
+- If “Back” must always go to a **known** screen (e.g. always **`/app/cities`**), use **`navigate('/app/cities')`** instead of **`-1`**.
+
+### ⚙️ 218.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- Section 218.2 wires **`useNavigate`** into **Worldwise**: register **`Form`**, navigate from **`Map`** to **`/app/form`**, refactor **`Button`**, and implement **Back** with **`navigate(-1)`** and **`preventDefault`**.
+- It contrasts **declarative** links with **imperative** **`navigate`** and shows **nested** relative paths under **`/app`**.
+- Subsections build in order: **route registration** → **map click navigation** → **shared button** → **form UI** → **hook + history back** → **form submit safety**.
+
+---
+
+#### 218.2.1 Registering the Form route in App
+
+**Subsection Summary:**
+- Introduces **programmatic navigation** as changing the URL **without** clicking a **`<Link>`** (the actual hook usage appears in later subsections).
+- Adds **`import Form`** and a **nested** **`<Route path="form" element={<Form />} />`** so **`/app/form`** renders the trip form.
+- **`section17-lecture218-001.png`** shows the **Form** view available under the app layout after the route exists.
+
+* **Programmatic navigation:** move to a new URL without the user having to click a link (you will call **`navigate`** from code in **`Map`** and **`Form`**).
+```jsx
+/* src/App.jsx */
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useState, useEffect } from "react";
+import Product from "./pages/Product";
+import Pricing from "./pages/Pricing";
+import Homepage from "./pages/Homepage";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./pages/AppLayout";
+import Login from './pages/Login'
+import CityList from "./components/CityList";
+import CountryList from './components/CountryList';
+import City from './components/City';
+import Form from './components/Form';                         // 👈🏽 ✅
+
+const BASE_URL = "http://localhost:8000"
+
+function App() {
+  const [cities, setCities] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchCities() {
+      try{
+        setIsLoading(true);
+        const res = await fetch(`${BASE_URL}/cities`);
+        const data = await res.json();
+        setCities(data);
+      } catch(error) {
+        console.error(error);
+        alert("There was an error loading data");
+      }
+      finally {
+        setIsLoading(false);
+      }
+    }
+    fetchCities();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Homepage />} />
+        <Route path="product" element={<Product />} />
+        <Route path="pricing" element={<Pricing />} />
+        <Route path="login" element={<Login />} />
+        <Route path="app" element={<AppLayout />}>
+          <Route index element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="cities" element={<CityList cities={cities} isLoading={isLoading} />}/>
+          <Route path="cities/:id" element={<City />}/>
+          <Route path="countries" element={ <CountryList cities={cities} isLoading={isLoading} /> }/>
+          <Route path="form" element={<Form />}/>               {/* 👈🏽 ✅ */}
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
+
+![form component enable](../img/section17-lecture218-001.png)
+
+#### 218.2.2 Imperative navigation on the Map with `useNavigate`
+
+**Subsection Summary:**
+- Contrasts **declarative** navigation (**`<Link>`**) with **imperative** **`navigate(...)`** invoked from an **`onClick`** on the map container.
+- **`navigate('form')`** performs a **relative** jump to the nested **`form`** route under **`/app`**, so the **Form** page appears without a dedicated link click.
+- **`section17-lecture218`** steps (see below) describe opening **`/app`**, clicking the map, and expecting the **Form**—the screenshot flow matches the new behavior.
+- **Caveat:** the inner **“Change position”** button sits inside the same clickable **`div`**; clicks may **bubble** and also trigger **`navigate('form')`** unless propagation is stopped (see Issues).
+
+* **Declarative vs imperative navigation:** links declare targets in JSX; **`useNavigate`** lets events or logic trigger a route change.
+
+```jsx
+/* src/components/Map.jsx */
+import { useSearchParams, useNavigate } from 'react-router-dom';                        // 👈🏽 ✅
+import styles from './Map.module.css';
+
+const Map = () => {
+  const navigate = useNavigate();                                                       // 👈🏽 ✅
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const lat = searchParams.get('lat');
+  const lng = searchParams.get('lng');
+
+  return (
+    <div className={styles.mapContainer} onClick={() => navigate('form')}>              {/* 👈🏽 ✅ */}
+      <h1>Map</h1>
+      <h2>
+        Position: {lat}, {lng}
+      </h2>
+      <button onClick={() => {setSearchParams({ lat: 23, lng: 50 })}}>Change position</button>
+    </div>
+  )
+}
+
+export default Map;
+```
+
+Steps:
+
+* go to [/app](http://localhost:5173/app).
+* click on any map part.
+* Expected: Form component is visible.
+
+#### 218.2.3 Reusable `Button` component
+
+**Subsection Summary:**
+- Extracts a small **`Button`** that applies **`Button.module.css`** classes from a **`type`** prop (**`primary`**, **`back`**, etc.).
+- Accepts **`onClick`** so parents (**`Form`**) can attach navigation or other handlers without duplicating markup.
+- This pattern keeps the form’s actions visually consistent while remaining a plain **`<button>`** under the hood.
+
+```jsx
+/* src/components/Button.jsx */
+import styles from './Button.module.css';
+
+const Button = ({children, onClick, type}) => {
+  return (
+    <button onClick={onClick} className={`${styles.btn} ${styles[type]}`}>
+      {children}
+    </button>
+  )
+}
+
+export default Button;
+```
+
+#### 218.2.4 Form with `Button` for Add and Back
+
+**Subsection Summary:**
+- Replaces raw **`<button>`** elements with **`Button`** for **Add** and **Back** so styles stay centralized.
+- **Back** has **no** **`onClick`** yet—this step is layout-only before wiring **`useNavigate`**.
+- **`section17-lecture218-002.png`** shows the styled **Add** / **Back** pair in the form footer.
+
+```jsx
+/* src/components/Form.jsx */
+import { useState } from "react";
+
+import Button from "./Button";                                            // 👈🏽 ✅
+
+import styles from "./Form.module.css";
+
+export function convertToEmoji(countryCode) {
+  const codePoints = countryCode
+    .toUpperCase()
+    .split("")
+    .map((char) => 127397 + char.charCodeAt());
+  return String.fromCodePoint(...codePoints);
+}
+
+function Form() {
+  const [cityName, setCityName] = useState("");
+  const [country, setCountry] = useState("");
+  const [date, setDate] = useState(new Date());
+  const [notes, setNotes] = useState("");
+
+  return (
+    <form className={styles.form}>
+      <div className={styles.row}>
+        <label htmlFor="cityName">City name</label>
+        <input
+          id="cityName"
+          onChange={(e) => setCityName(e.target.value)}
+          value={cityName}
+        />
+        {/* <span className={styles.flag}>{emoji}</span> */}
+      </div>
+
+      <div className={styles.row}>
+        <label htmlFor="date">When did you go to {cityName}?</label>
+        <input
+          id="date"
+          onChange={(e) => setDate(e.target.value)}
+          value={date}
+        />
+      </div>
+
+      <div className={styles.row}>
+        <label htmlFor="notes">Notes about your trip to {cityName}</label>
+        <textarea
+          id="notes"
+          onChange={(e) => setNotes(e.target.value)}
+          value={notes}
+        />
+      </div>
+
+      <div className={styles.buttons}>
+        {/* <button>Add</button> */}
+        <Button type='primary'>Add</Button>                                 {/* 👈🏽 ✅ */}
+        {/* <button>&larr; Back</button> */}
+        <Button type='back'>&larr; Back</Button>                            {/* 👈🏽 ✅ */}
+      </div>
+    </form>
+  );
+}
+
+export default Form;
+```
+
+!["Add" and "Back" buttons with styles - Button component](../img/section17-lecture218-002.png)
+
+#### 218.2.5 `useNavigate` and `navigate(-1)` on Back
+
+**Subsection Summary:**
+- Imports **`useNavigate`**, calls **`const navigate = useNavigate()`**, and wires **Back** with **`onClick={() => navigate(-1)}`** to mirror **browser history back**.
+- **`navigate(-1)`** does **not** require a path string—it moves one step backward in the stack (when possible).
+- Inside a **`<form>`**, a **`<button>`** without **`type="button"`** may act as **submit**; this snippet illustrates the hook first—**218.2.6** adds **`preventDefault`** (see Issues).
+
+```jsx
+/* src/components/Form.jsx */
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";                                   // 👈🏽 ✅
+
+import Button from "./Button";
+
+import styles from "./Form.module.css";
+
+export function convertToEmoji(countryCode) {
+  const codePoints = countryCode
+    .toUpperCase()
+    .split("")
+    .map((char) => 127397 + char.charCodeAt());
+  return String.fromCodePoint(...codePoints);
+}
+
+function Form() {
+  const navigate = useNavigate();                                                 // 👈🏽 ✅
+  const [cityName, setCityName] = useState("");
+  const [country, setCountry] = useState("");
+  const [date, setDate] = useState(new Date());
+  const [notes, setNotes] = useState("");
+
+  return (
+    <form className={styles.form}>
+      <div className={styles.row}>
+        <label htmlFor="cityName">City name</label>
+        <input
+          id="cityName"
+          onChange={(e) => setCityName(e.target.value)}
+          value={cityName}
+        />
+        {/* <span className={styles.flag}>{emoji}</span> */}
+      </div>
+
+      <div className={styles.row}>
+        <label htmlFor="date">When did you go to {cityName}?</label>
+        <input
+          id="date"
+          onChange={(e) => setDate(e.target.value)}
+          value={date}
+        />
+      </div>
+
+      <div className={styles.row}>
+        <label htmlFor="notes">Notes about your trip to {cityName}</label>
+        <textarea
+          id="notes"
+          onChange={(e) => setNotes(e.target.value)}
+          value={notes}
+        />
+      </div>
+
+      <div className={styles.buttons}>
+        {/* <button>Add</button> */}
+        <Button type='primary'>Add</Button>
+        {/* <button>&larr; Back</button> */}
+        <Button type='back' onClick={() => navigate(-1)}>&larr; Back</Button>   {/* 👈🏽 ✅ */}
+      </div>
+    </form>
+  );
+}
+
+export default Form;
+```
+
+#### 218.2.6 `preventDefault` on Back inside the form
+
+**Subsection Summary:**
+- Wraps the Back handler so **`e.preventDefault()`** runs before **`navigate(-1)`**, avoiding unintended **form submission** when the default **`<button>`** type would submit.
+- Matches the **current project** implementation in **`src/components/Form.jsx`** (handler receives the event, prevents default, then navigates).
+- **Add** may still need **`type="button"`** on **`Button`** if it must never submit—addressed in Pending Fixes.
+
+```jsx
+/* src/components/Form.jsx */
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import Button from "./Button";
+
+import styles from "./Form.module.css";
+
+export function convertToEmoji(countryCode) {
+  const codePoints = countryCode
+    .toUpperCase()
+    .split("")
+    .map((char) => 127397 + char.charCodeAt());
+  return String.fromCodePoint(...codePoints);
+}
+
+function Form() {
+  const navigate = useNavigate();
+  const [cityName, setCityName] = useState("");
+  const [country, setCountry] = useState("");
+  const [date, setDate] = useState(new Date());
+  const [notes, setNotes] = useState("");
+
+  return (
+    <form className={styles.form}>
+      <div className={styles.row}>
+        <label htmlFor="cityName">City name</label>
+        <input
+          id="cityName"
+          onChange={(e) => setCityName(e.target.value)}
+          value={cityName}
+        />
+        {/* <span className={styles.flag}>{emoji}</span> */}
+      </div>
+
+      <div className={styles.row}>
+        <label htmlFor="date">When did you go to {cityName}?</label>
+        <input
+          id="date"
+          onChange={(e) => setDate(e.target.value)}
+          value={date}
+        />
+      </div>
+
+      <div className={styles.row}>
+        <label htmlFor="notes">Notes about your trip to {cityName}</label>
+        <textarea
+          id="notes"
+          onChange={(e) => setNotes(e.target.value)}
+          value={notes}
+        />
+      </div>
+
+      <div className={styles.buttons}>
+        {/* <button>Add</button> */}
+        <Button type='primary'>Add</Button>
+        {/* <button>&larr; Back</button> */}
+        <Button type='back' onClick={(e) => {                                   {/* 👈🏽 ✅ */}
+          e.preventDefault();                                                   {/* 👈🏽 ✅ */}
+          navigate(-1);
+        }}>&larr; Back</Button>
+      </div>
+    </form>
+  );
+}
+
+export default Form;
+```
+
+### 🐞 218.3 Issues:
+
+- **`Map` container click vs inner button:** The **`mapContainer`** **`onClick`** calls **`navigate('form')`** while **“Change position”** is a child **`button`**. Without **`stopPropagation`** on the button, a click can **bubble** to the container and **also** navigate away—undesirable double behavior.
+- **Default `button` type in forms:** **`Button`** renders **`<button>`** without **`type`**. Inside **`<form>`**, the HTML default is often **`submit`**. **Back** is fixed with **`preventDefault`** in the **final** code; **Add** may still submit the form in some browsers until **`type="button"`** is set.
+- **Date input `value` type:** **`Form`** uses **`useState(new Date())`** but passes **`value={date}`** to **`type="date"`** (or text) — a **`Date`** object is not a valid controlled string for **`input`**; may show **`[object Object]`** or warn until refactored to **`YYYY-MM-DD`** string state.
+- **`navigate('form')` on a `div`:** Using a **`div`** as the sole click target for navigation is **not keyboard-accessible** by default (no **`role`**, **`tabIndex`**, **`onKeyDown`**); prefer a **`<button>`** overlay or link-styled control for production.
+- **History depth:** **`navigate(-1)`** on **Back** depends on prior history; deep-linking directly to **`/app/form`** can make “back” exit the app or behave unexpectedly.
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| Clicks bubble from map **“Change position”** to **`navigate('form')`** | ⚠️ Identified | `src/components/Map.jsx:11-18` — `onClick` on `mapContainer` wraps the inner `button`; add `e.stopPropagation()` on the button handler or restructure layout |
+| **`Button` lacks explicit `type` inside forms** | ⚠️ Identified | `src/components/Button.jsx:3-6` — `button` defaults to `submit` in forms; `src/components/Form.jsx:55-62` — Back uses `preventDefault`; Add may still submit |
+| `Date` object as `input` **value** | ⚠️ Identified | `src/components/Form.jsx:20-42` — `useState(new Date())` with `value={date}` on `input` |
+| `div` + `onClick` for navigation (a11y) | ℹ️ Low Priority | `src/components/Map.jsx:11-12` — not keyboard-focusable; use `button`/`Link` or ARIA pattern |
+| **`navigate(-1)`** with empty history | ℹ️ Informational | `src/components/Form.jsx:59-62` — direct visits to `/app/form` may leave app on back |
+
+### 🧱 218.4 Pending Fixes (TODO)
+
+- [ ] **Stop propagation on `Map`:** In `src/components/Map.jsx`, on the **“Change position”** `button` `onClick`, call `e.stopPropagation()` (or move navigation off the outer `div`) so updating search params does not also trigger `navigate('form')`.
+- [ ] **Set `type` on `Button`:** In `src/components/Button.jsx`, render `<button type="button" …>` (or add a `buttonType` prop defaulting to `'button'`) so **Add** and **Back** never submit the form unless intentionally submitted via `form`’s `onSubmit`.
+- [ ] **Normalize date state:** In `src/components/Form.jsx`, store the date as an ISO date string (`YYYY-MM-DD`) for the date input, or use `type="date"` with string state initialized from `new Date().toISOString().slice(0, 10)`.
+- [ ] **Accessible map navigation:** Replace or supplement `div` onClick in `Map.jsx` with a focusable control (`<button>` or `<Link>`) and `aria-label` describing “Open add trip form”.
+- [ ] **Optional explicit back target:** If UX should always return to `CityList` or `/app/cities`, consider `navigate('/app/cities')` instead of `navigate(-1)` when history is shallow.
+
+[↑ top — 218. Lesson 218 — *Programmatic Navigation with useNavigate*](#-218-lesson-218--programmatic-navigation-with-usenavigate)
+
+<br>
 
 
 

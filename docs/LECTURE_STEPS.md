@@ -4337,6 +4337,308 @@ export default App;
 
 
 
+<br>
+
+## 🔧 217. Lesson 217 — *Reading and Setting a Query String*
+
+[🧳 Section 17: *React Route: Building Single-Page Applications (SPA)*](#-section-17-react-route-building-single-page-applications-spa)
+
+### 📑 Table of Contents:
+- [217. Lesson 217 — *Reading and Setting a Query String*](#-217-lesson-217--reading-and-setting-a-query-string)
+- [217.1 Context](#-2171-context)
+- [217.2 Updating code/theory according the context](#-2172-updating-codetheory-according-the-context)
+  - [217.2.1 Expose position from each city and log it](#21721-expose-position-from-each-city-and-log-it)
+  - [217.2.2 Append lat and lng to the city Link as a query string](#21722-append-lat-and-lng-to-the-city-link-as-a-query-string)
+  - [217.2.3 Read search params in Map with useSearchParams](#21723-read-search-params-in-map-with-useSearchParams)
+  - [217.2.4 Read lat and lng in City alongside the dynamic id](#21724-read-lat-and-lng-in-city-alongside-the-dynamic-id)
+  - [217.2.5 Update the query string programmatically with setSearchParams](#21725-update-the-query-string-programmatically-with-setSearchParams)
+- [217.3 Issues](#-2173-issues)
+- [217.4 Pending Fixes (TODO)](#-2174-pending-fixes-todo)
+
+### 🧠 217.1 Context:
+
+**Query strings** (the part of the URL after `?`, e.g. `?lat=38.72&lng=-9.14`) hold **optional, non-hierarchical** data that still belongs in the address bar: filters, map coordinates, tabs, or sort order. Unlike **path parameters** (`:id`), search params do not define *which* route matches—they refine the view for the **same** matched route.
+
+In **Worldwise**, each city already has a **`position`** object (`lat`, `lng`). The lesson wires those values into the URL when navigating from **`CityItem`** so **`Map`** and **`City`** can read a **shareable, bookmarkable** map position without new global state. React Router exposes this through **`useSearchParams()`**, which mirrors **`useState`** for the query string: you **read** with **`searchParams.get("key")`** and **write** with **`setSearchParams(object)`** (or a functional updater).
+
+**Key Concepts:**
+
+1. **Query string vs path params** — Path segments identify the *resource* (`/app/cities/:id`); search params carry *extra state* (coordinates, UI mode) that can be omitted or changed without replacing the route pattern.
+2. **`URLSearchParams` in the location** — The browser parses `?lat=…&lng=…` into key/value pairs; React Router keeps them in sync with navigation.
+3. **`useSearchParams()`** — Returns **`[searchParams, setSearchParams]`** where **`searchParams`** behaves like **`URLSearchParams`** (`get`, `has`, etc.) and **`setSearchParams`** merges or replaces the query portion of the URL.
+4. **String values** — **`searchParams.get("lat")`** returns a **string** or **`null`** if missing; numeric coords are represented as text in the URL.
+5. **Links with search** — A **`Link`** **`to`** value can append a query string to the path (for example using a template literal with **`?lat=`** and **`&lng=`**) so navigation updates both the pathname and the search string.
+
+**Advantages:**
+
+- **Shareable URLs** — Users can copy/paste a link that includes map position or filters.
+- **Browser history** — Changing search params can create history entries; back/forward can restore prior queries (depending on how updates are applied).
+- **Separation of concerns** — Keep stable resource IDs in the path; put “view options” in the query string.
+- **Familiar API** — **`get` / `setSearchParams`** map cleanly to how servers and `fetch` already think about query strings.
+
+**Disadvantages / Gotchas:**
+
+- **`get` returns `null`** — If the user opens `/app/cities/1` with no query, **`lat`** / **`lng`** may be **`null`**; UI may briefly show **`null`** or need defaults.
+- **Everything is a string** — Compare and parse carefully (`Number(searchParams.get("lat"))`) when doing math or map APIs.
+- **Encoding** — Concatenating simple numeric coordinates into the URL is usually safe; arbitrary text values should use **`encodeURIComponent`** or the **`setSearchParams`** object form to avoid broken URLs.
+- **Duplicate sources of truth** — Coordinates might exist both on the **city object** and in the URL; the app must decide which wins when they disagree.
+
+**When to Consider Alternatives:**
+
+- **Complex nested state** — Very large or nested filter objects may be better in **context**, **URL state libraries**, or **session storage** than a long query string.
+- **Private or sensitive data** — Do not put secrets in the query string (URLs leak via logs and Referer).
+- **When the server must own the ID only** — If only `:id` should matter, fetch **`position`** from an API by **`id`** instead of duplicating it in the query (trade-off: fewer bytes in the URL vs. one round trip).
+
+**In this project:** **`CityItem`** sets **`lat` / `lng`** on the link to **`/app/cities/:id`**. **`Map`** and **`City`** read those values with **`useSearchParams()`**; **`Map`** also demonstrates **`setSearchParams`** to change position from a button.
+
+### ⚙️ 217.2 Updating code/theory according the context:
+
+#### **Summary**
+
+- This section shows how to **pass geographic coordinates through the URL** as a **query string** while keeping the **dynamic city id** in the **path**.
+- It connects **list navigation** (`CityItem` → `Link`), **map display** (`Map`), and **city detail** (`City`) so all three read the **same** `lat` / `lng` search params.
+- Subsections progress from **inspecting data** (`position`), **writing** the query on links, **reading** it in **`Map`**, **reusing** the read pattern in **`City`**, then **mutating** the query with **`setSearchParams`** for interactive demos.
+
+#### 217.2.1 Expose `position` from each `city` and log it
+
+**Subsection Summary**
+
+- Confirms each **`city`** includes a **`position`** object suitable for map centering (and logs it for debugging).
+- Prepares the next step: values are available to append to the **`Link`** as **`lat`** / **`lng`** query keys.
+- The screenshot **`section17-lecture217-001.png`** illustrates **`console.log(position)`** output (e.g. `{ lat, lng }`) in DevTools.
+
+```jsx
+/* src/components/CityItem.jsx */
+import { Link } from 'react-router-dom';
+import styles from './CityItem.module.css';
+
+const formatDate = (date) => 
+  new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
+
+const CityItem = ( {city} ) => {
+  const { emoji, cityName, date, id, position } = city;             // 👈🏽 ✅
+  console.log(position);                                            // 👈🏽 ✅
+
+  return (
+    <li>
+      <Link className={styles.cityItem} to={`/app/cities/${id}`}>
+        <span className={styles.emoji}>{emoji}</span>
+        <h3 className={styles.name}>{cityName}</h3>
+        <time className={styles.date}>{formatDate(date)}</time>
+        <button className={styles.deleteBtn}>&times;</button>
+      </Link>
+    </li>
+  )
+}
+
+export default CityItem;
+```
+
+![position from console](../img/section17-lecture217-001.png)
+
+#### 217.2.2 Append `lat` and `lng` to the city Link as a query string
+
+**Subsection Summary**
+
+- Extends the **`to`** prop so the URL includes **`?lat=…&lng=…`** taken from **`position`**, alongside the existing **`/app/cities/${id}`** path.
+- Encodes the idea that **map coordinates are “optional view state”** carried in the search string while the **city id** remains the path param.
+- **`section17-lecture217-002.png`** shows the browser address bar (or link preview) with **`lat`** and **`lng`** present in the query.
+
+```jsx
+/* src/components/CityItem.jsx */
+import { Link } from 'react-router-dom';
+import styles from './CityItem.module.css';
+
+const formatDate = (date) => 
+  new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
+
+const CityItem = ( {city} ) => {
+  const { emoji, cityName, date, id, position } = city;
+  console.log(position);
+
+  return (
+    <li>
+      <Link 
+        className={styles.cityItem} 
+        to={`/app/cities/${id}?lat=${position.lat}&lng=${position.lng}`}      // 👈🏽 ✅
+      >
+        <span className={styles.emoji}>{emoji}</span>
+        <h3 className={styles.name}>{cityName}</h3>
+        <time className={styles.date}>{formatDate(date)}</time>
+        <button className={styles.deleteBtn}>&times;</button>
+      </Link>
+    </li>
+  )
+}
+
+export default CityItem;
+```
+
+![position: lat and lng](../img/section17-lecture217-002.png)
+
+#### 217.2.3 Read search params in Map with `useSearchParams`
+
+**Subsection Summary**
+
+- Introduces **`useSearchParams`** from **`react-router-dom`** to **read** the current **`lat`** / **`lng`** from the URL inside **`Map`**.
+- Uses **`searchParams.get('lat')`** and **`searchParams.get('lng')`** and renders them in the UI as **`Position: {lat}, {lng}`**.
+- **`section17-lecture217-003.png`** shows the **Map** view displaying the parsed coordinates after navigation from a city link.
+
+```jsx
+/* src/components/Map.jsx */
+import { useSearchParams } from 'react-router-dom';
+import styles from './Map.module.css';
+
+const Map = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const lat = searchParams.get('lat');
+  const lng = searchParams.get('lng');
+
+  return (
+    <div className={styles.mapContainer}>
+      <h1>Map</h1>
+      <h2>
+        Position: {lat}, {lng}
+      </h2>
+    </div>
+  )
+}
+
+export default Map;
+```
+
+![](../img/section17-lecture217-003.png)
+
+#### 217.2.4 Read `lat` and `lng` in `City` alongside the dynamic `id`
+
+**Subsection Summary**
+
+- Combines **`useParams()`** (for **`id`**) with **`useSearchParams()`** (for **`lat`** / **`lng`**) in the same component—typical for detail pages that need both **resource id** and **view/search state**.
+- Renders **`latitude`** / **`longitude`** from the query string under the city heading while **`TEMP DATA`** still supplies label fields for the stub UI.
+- **`section17-lecture217-004.png`** shows **City** with **`Id`** from the path and coordinates from the query.
+
+```jsx
+/* src/components/City.jsx */
+import { useParams, useSearchParams } from "react-router-dom";
+import styles from "./City.module.css";
+
+const formatDate = (date) =>
+  new Intl.DateTimeFormat("en", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    weekday: "long",
+  }).format(new Date(date));
+
+function City() {
+  const [searchParams, setSearchParams] = useSearchParams();    // 👈🏽 ✅
+
+  const lat = searchParams.get("lat");                          // 👈🏽 ✅
+  const lng = searchParams.get("lng");                          // 👈🏽 ✅
+
+  const { id } = useParams();
+  console.log("CityId: ", id);
+
+  // TEMP DATA
+  const currentCity = {
+    cityName: "Lisbon",
+    emoji: "🇵🇹",
+    date: "2027-10-31T15:59:59.138Z",
+    notes: "My favorite city so far!",
+  };
+
+  const { cityName, emoji, date, notes } = currentCity;
+  return (
+    <>
+      <h1>{emoji} {cityName} city</h1>
+      <h2>Id: {id}</h2>
+      <h2>
+        Position: 
+      </h2>
+      <p>latitude: {lat}, longitude: {lng}</p>                      {/* 👈🏽 ✅ */}
+    </>
+  );
+}
+
+export default City;
+```
+
+![position: lat & lng inside city component](../img/section17-lecture217-004.png)
+
+#### 217.2.5 Update the query string programmatically with `setSearchParams`
+
+**Subsection Summary**
+
+- Demonstrates **writing** search params: **`setSearchParams({ lat: 23, lng: 50 })`** updates the URL without a full navigation component, so **`Map`** (and any other reader) sees new **`lat`** / **`lng`** values.
+- Shows the **second element** of the **`useSearchParams`** tuple as the imperative counterpart to declarative **`Link`** updates.
+- **`section17-lecture217-005.png`** captures the UI after clicking **“Change position”**, with the address bar / on-screen position reflecting the new query.
+
+```jsx
+/* src/components/Map.jsx */
+import { useSearchParams } from 'react-router-dom';
+import styles from './Map.module.css';
+
+const Map = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const lat = searchParams.get('lat');
+  const lng = searchParams.get('lng');
+
+  return (
+    <div className={styles.mapContainer}>
+      <h1>Map</h1>
+      <h2>
+        Position: {lat}, {lng}
+      </h2>
+      <button onClick={() => {setSearchParams({ lat: 23, lng: 50 })}}>Change position</button>
+    </div>
+  )
+}
+
+export default Map;
+```
+
+![clicking on change position button in the map](../img/section17-lecture217-005.png)
+
+### 🐞 217.3 Issues:
+
+- **`City` still uses `TEMP DATA`**: The **`id`** and query **`lat` / `lng`** come from the URL, but **`cityName`**, **`emoji`**, etc. remain hard-coded to Lisbon—misleading when opening another city.
+- **`console.log` noise**: **`CityItem`** logs **`position`** and **`City`** logs **`CityId`** on every render—should be removed or dev-only before shipping.
+- **Unused bindings**: **`City`** destructures **`setSearchParams`** and imports **`styles`** / **`formatDate`** while the active return does not use them—dead code and linter warnings.
+- **Missing query string**: If the user navigates to **`/app/cities/:id`** without **`?lat=&lng=`**, **`searchParams.get`** returns **`null`**; the UI may show **`Position: null, null`** until a link with params is used.
+- **`setSearchParams` demo uses numeric literals**: React Router serializes them; consistent with the lesson, but real map code may want **`String(lat)`** or fixed precision for URLs.
+- **`CityItem` delete button inside `Link`**: Nested **`button`** inside **`Link`** remains an accessibility / event-propagation concern (carried from earlier lessons).
+
+| Issue | Status | Log/Error |
+|---|---|---|
+| `TEMP DATA` out of sync with URL `id` | ⚠️ Identified | `src/components/City.jsx:21-37` — Lisbon stub while **`id`** reflects the selected city |
+| `console.log` in `CityItem` / `City` | ℹ️ Low Priority | `src/components/CityItem.jsx:13` — `console.log(position)`; `src/components/City.jsx:19` — `console.log("CityId: ", id)` |
+| Unused `setSearchParams`, `styles`, `formatDate` in `City` | ℹ️ Low Priority | `src/components/City.jsx:1-16` — `setSearchParams` unused; `styles` / `formatDate` unused in active JSX |
+| Null **`lat` / `lng`** when query missing | ℹ️ Informational | `src/components/Map.jsx:7-15`, `src/components/City.jsx:15-16` — **`get`** returns **`null`**; consider defaults or conditional UI |
+| Nested delete **`button`** in **`Link`** | ℹ️ Low Priority | `src/components/CityItem.jsx:17-22` — prefer **`preventDefault`** pattern or restructure |
+
+### 🧱 217.4 Pending Fixes (TODO)
+
+- [ ] **Resolve city from `id`**: Replace **`TEMP DATA`** in `src/components/City.jsx` (~lines 21–29) with **`cities.find((c) => String(c.id) === id)`** and pass **`cities`** via **`useOutletContext`** (or equivalent) from `AppLayout` / `App`.
+- [ ] **Align coordinates with city data**: Either treat URL **`lat` / `lng`** as the source of truth for the map or derive them from the found city’s **`position`** when the query is absent—avoid contradictory state.
+- [ ] **Remove or guard logs**: Delete `console.log` in `src/components/CityItem.jsx:13` and `src/components/City.jsx:19`, or wrap with **`import.meta.env.DEV`** (Vite).
+- [ ] **Handle missing search params**: In `Map.jsx` and `City.jsx`, default **`lat` / `lng`** (e.g. city center) or show a short hint when **`searchParams.get`** returns **`null`**.
+- [ ] **Clean up `City` imports**: Remove unused **`setSearchParams`** from the hook destructure if only reading; use **`styles`** and **`formatDate`** when restoring the full layout, or remove unused imports until then.
+- [ ] **`CityItem` delete control**: Implement delete with **`e.preventDefault()`** on the button or move the **×** outside the **`Link`** (`src/components/CityItem.jsx:17-22`).
+
+[↑ top — 217. Lesson 217 — *Reading and Setting a Query String*](#-217-lesson-217--reading-and-setting-a-query-string)
+
+
+
 
 
 
